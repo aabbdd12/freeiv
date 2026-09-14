@@ -16,8 +16,8 @@ is bounded by
 and that interval is *exactly* the region where the implied variances are
 non-negative. No distributional assumption is used to obtain it. Every point
 estimator then adds one assumption to close the system, so the package
-reports them side by side against the interval, with the diagnostic that
-says whether each one's assumption is tenable on these data.
+reports them side by side against the interval, with the diagnostic that says
+whether each one's assumption is tenable on these data.
 
 An estimate that falls outside the interval is not a large estimate. It is an
 infeasible one: it implies a negative variance under the maintained model.
@@ -26,12 +26,9 @@ infeasible one: it implies a negative variance under the maintained model.
 ## Install
 
 ```stata
-net install freeiv, from("https://raw.githubusercontent.com/aabbdd12/freeiv/main/package") replace
-net get     freeiv, from("https://raw.githubusercontent.com/aabbdd12/freeiv/main/package") replace
+net install freeiv, from("https://raw.githubusercontent.com/aabbdd12/freeiv/main") replace
+net get     freeiv, from("https://raw.githubusercontent.com/aabbdd12/freeiv/main") replace
 ```
-
-The repository holds the whole project; the installable package sits in
-`package/`, which is the address above.
 
 `net get` is a separate step and it matters: the four example datasets are
 ancillary files, so `net install` alone does not bring them down.
@@ -81,8 +78,8 @@ eight free parameters, so one over-identifying restriction. It is minimised
 disappears, so all nine residuals become linear in the six remaining
 parameters. The eight-parameter problem is a two-dimensional surface, and a
 surface can be gridded. No seed, no starting value, same data same number.
-Multi-start over the eight parameters returns a *local* minimum on six of
-the eight datasets of that paper.
+Multi-start over the eight parameters returns a *local* minimum on six of the
+eight datasets of that paper.
 
 Because the criterion is often nearly flat, the route also returns the range
 of `gamma` over which the profiled Hansen statistic stays within 3.84 of its
@@ -139,6 +136,57 @@ none is a black box.
 | `freeiv_proxy` | two endogenous regressors loading on one confounder |
 | `freeiv_card` | the Card (1995) extract of Araar (2026d) — one endogenous regressor can only be bounded there, while a second indicator identifies it |
 
+## What else is in this repository
+
+The installable files sit at the root, where `net install` expects to find
+them. Everything that produced them is kept alongside, on the view that a
+method's claims are only as good as the evidence you can inspect.
+
+```
+*.ado  *.sthlp  *.dlg  freeiv.pkg  stata.toc  *.dta    the package itself
+src/        the same ado-files as sources, and every test do-file
+python/     the reference library the ado follows, and the papers' own code
+logs/       the Stata logs those tests produced, as produced
+data/       the datasets, including the six LSZ test-bench simulations
+papers/     the papers of the series
+notes/      the plan, the working notes and the correction notes
+```
+
+[`DEVELOPMENT.md`](DEVELOPMENT.md) is the brick-by-brick record: what each
+step added and what it was checked against.
+
+### Which test file proves what
+
+| do-file | what it establishes |
+|---|---|
+| `freeiv_test1.do` | the closed forms of model A against the Python library, figure by figure |
+| `freeiv_boot.do` | the analytic standard errors against a 400-replication bootstrap |
+| `freeiv_test3.do` | `freeivmenu` and `freeivdiag` |
+| `freeiv_test4.do` | model B, the two-indicator closed form and its guards |
+| `freeiv_test5.do` | the literature routes against `ivreg2h` and `psacalc` |
+| `freeiv_test6.do`, `freeiv_test6b.do` | the profiled GMM, and `lsz` against `trigmm` |
+| `freeiv_test7.do` | the three statistics of model B, and that they separate |
+| `freeiv_test8.do`, `freeiv_test8b.do` | the package, installed and run from the installed copy |
+| `freeiv_test9.do` | factor variables and twenty refusals |
+| `freeiv_test10.do` | every example the help prints, and Table 6 of Araar (2026d) |
+| `freeiv_test11.do` | `method(gmm)` against Table 4 of Araar (2026c), row by row |
+
+### Reference commands, not redistributed
+
+The package was validated against three published commands. They are not in
+this repository, because they are not ours to license. Install them yourself
+to repeat those checks:
+
+- `trigmm` — `ssc install trigmm`, or `st0797` from
+  http://www.stata-journal.com/software/sj26-1: the reference for
+  `method(lsz)`
+- `ivreg2h` (SSC): the reference for `method(lewbel12)`
+- `psacalc` (SSC): the reference for `method(oster)`
+
+`freeiv_test5.do` and `freeiv_test6b.do` then reproduce the agreement:
+`lewbel12` equals `ivreg2h` to six decimals, `oster` equals `psacalc` to
+five, and `lsz` matches `trigmm` to ten.
+
 ## Papers
 
 The methods implemented here are developed in four working papers, all on
@@ -161,9 +209,7 @@ Zenodo.
 
 `method(lewbel12)` follows Lewbel (2012) as `ivreg2h` implements it,
 `method(lsz)` follows Lewbel, Schennach and Zhang (2024) as `trigmm` does,
-and `method(oster)` follows Oster (2019) as `psacalc` does. Each was
-validated against its reference command; the agreement is documented in the
-test files.
+and `method(oster)` follows Oster (2019) as `psacalc` does.
 
 ## Citing
 
@@ -179,4 +225,5 @@ Abdelkrim Araar, Université Laval and the Partnership for Economic Policy —
 
 ## Licence
 
-MIT.
+MIT, for the code in this repository. The external commands named above are
+under their own licences and are not included.
