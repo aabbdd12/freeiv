@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.15.0  14sep2026}{...}
+{* *! version 0.16.0  14sep2026}{...}
 {vieweralsosee "[R] ivregress" "help ivregress"}{...}
 {vieweralsosee "freeivmenu" "help freeivmenu"}{...}
 {vieweralsosee "freeivdiag" "help freeivdiag"}{...}
@@ -585,11 +585,16 @@ because here they should agree{p_end}
 {pstd}
 {cmd:method(gmm)} prints, under its Hansen J, the range of gamma at which that
 J stays within 3.84 of its minimum, and what share of the identified interval
-that range covers.  On {cmd:freeiv_sim1} the identification is strong, so the
-share is well below one and the higher moments are doing real work; a share
-near one says the opposite, and on the Wooldridge datasets of Araar (2026c) it
-is one on seven of the eight.  Read that share before the point estimate: it
-is valid whether or not the minimum is interior, which the standard error is
+that range covers.  On {cmd:freeiv_sim1} it covers about 64% of the interval:
+identification is strong here, so the moments of orders three and four really
+do narrow what the second-order algebra gives on its own.  Keep that number in
+mind -- example 3 shows the same statistic on real data, where it behaves
+quite differently.
+
+{pstd}
+Read the share before the point estimate.  It inverts the J at each fixed
+gamma instead of inverting a Wald statistic around the optimum, so it stays
+valid whether or not the minimum is interior -- which the standard error does
 not.
 
 
@@ -632,6 +637,7 @@ of Araar (2026d).  With the controls of that paper{p_end}
 {phang2}{cmd:. use freeiv_card, clear}{p_end}
 {phang2}{cmd:. freeivmenu lwage exper expersq black south smsa (educ)}{p_end}
 {phang2}{cmd:. freeiv lwage exper expersq black south smsa (educ)}{p_end}
+{phang2}{cmd:. freeiv lwage exper expersq black south smsa (educ), method(all)}{p_end}
 
 {pstd}
 the retained value does fall inside the identified interval and the implied
@@ -640,6 +646,20 @@ discriminant indistinguishable from zero, and the QME's standard error is
 proportional to 1/sqrt(D).  The honest reading on these data is the interval,
 not the point.  This is the ordinary case with one endogenous regressor, and
 it is why {helpb freeivmenu} exists.
+
+{pstd}
+Four independent diagnostics say it, which is the point of running
+{cmd:method(all)} here.  The discriminant is indistinguishable from zero, so
+the third-order route carries almost no signal.  The region where the joint
+GMM's J stays within 3.84 of its minimum covers the identified interval
+{it:entirely} -- every value the assumption-free bounds admit is a value the
+nine moment conditions cannot reject -- against 64% on {cmd:freeiv_sim1}, so
+the fourth-order moments add nothing here at all.  That GMM's minimum sits on the {it:boundary}, with the implied
+confounder variance at its floor, and the command prints no standard error
+because none is valid there.  And the LSZ solver does not converge on the same
+data, which is reported rather than hidden behind the tightest-looking
+interval in the table.  Four routes, four ways of saying that these data do
+not identify a point.
 
 {pstd}
 Dropping a control changes the answer, and the command says why rather than
