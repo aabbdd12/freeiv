@@ -1,0 +1,4 @@
+v 3
+d freeiv -- instrument-free estimation of a linear structural model
+d Abdelkrim Araar, Universite Laval and PEP
+p freeiv Instrument-free estimation without an external instrument

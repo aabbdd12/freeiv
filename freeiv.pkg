@@ -1,0 +1,73 @@
+v 3
+d freeiv: Instrument-free estimation of a linear structural model
+d
+d  freeiv estimates the coefficient on an endogenous regressor without an
+d  external instrument.  Under scale consistency alone -- the confounder's
+d  direct loading in the outcome equation is proportional to its loading in
+d  the first stage -- the coefficient is bounded by [gamma-tilde/2,
+d  gamma-tilde], where gamma-tilde is the OLS slope, and that interval is
+d  exactly the region where the implied variances are non-negative.  Every
+d  point estimator adds one assumption to close the system; the package shows
+d  them side by side against the interval so that each can be judged.
+d
+d  Routes implemented: the identified set; the quadratic moment estimator
+d  (default), which needs only a non-zero third moment of the confounder; the
+d  cubic under equal variances and its scale-free counterpart; the
+d  higher-moment estimator; quantile bias extrapolation; two GMM routes on the
+d  moments of orders two, three and four, each with its over-identification
+d  test -- the joint nine-moment estimator of Araar (2026c), minimised on a
+d  deterministic two-dimensional grid rather than by multi-start, which also
+d  returns the region of gamma where the profiled Hansen statistic is within
+d  3.84 of its minimum, and the profiled variant, which is one-dimensional and
+d  needs no optimiser at all; Lewbel, Schennach and Zhang (2024) as trigmm
+d  implements it; and, for
+d  comparison on the same data, Lewbel (2012), the Gaussian copula, the rank
+d  control function, and Oster (2019).
+d
+d  Two endogenous variables sharing one latent confounder switch to the
+d  two-indicator model, where the confounder's direct loading is free and
+d  identified -- which is what makes scale consistency itself testable.
+d
+d  Companion commands: freeivmenu says which routes the data can carry before
+d  any estimation; freeivdiag says what a value of gamma implies about the
+d  unobservables, whatever produced it; freeivtest reports endogeneity,
+d  agreement between routes, and an outside estimate against the identified
+d  set; freeivreport assembles all of it into one table.
+d
+d  Four datasets travel with the package and are retrieved with -net get
+d  freeiv-.  Three are simulated and their generating equations are printed in
+d  help freeiv, so none is a black box: freeiv_sim1 satisfies the model and the
+d  true coefficient is known, freeiv_sim2 differs from it only in that the
+d  first-stage disturbance is skewed, which invalidates the symmetry route and
+d  leaves the others intact, and freeiv_proxy carries two endogenous regressors
+d  loading on one confounder.  The fourth, freeiv_card, is the Card (1995)
+d  extract used in the empirical section of Araar (2026d), distributed with
+d  Wooldridge's teaching datasets; on it a single endogenous regressor can only
+d  be bounded, while a second indicator of the same confounder identifies it,
+d  which is the argument of that paper on its own data.
+d
+d Requires: Stata version 16
+d
+d Distribution-Date: 20260914
+d
+d Author: Abdelkrim Araar, Universite Laval and PEP
+d Support: email aabd@ecn.ulaval.ca
+d
+f freeiv.ado
+f freeiv_engine.ado
+f freeiv_mata.ado
+f freeivmenu.ado
+f freeivdiag.ado
+f freeivtest.ado
+f freeivreport.ado
+f freeiv.sthlp
+f freeivmenu.sthlp
+f freeivdiag.sthlp
+f freeivtest.sthlp
+f freeivreport.sthlp
+f freeiv.dlg
+f freeiv_card.dta
+f freeiv_sim1.dta
+f freeiv_sim2.dta
+f freeiv_proxy.dta
+e
