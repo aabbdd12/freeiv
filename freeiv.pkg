@@ -20,9 +20,8 @@ d  deterministic two-dimensional grid rather than by multi-start, which also
 d  returns the region of gamma where the profiled Hansen statistic is within
 d  3.84 of its minimum, and the profiled variant, which is one-dimensional and
 d  needs no optimiser at all; Lewbel, Schennach and Zhang (2024) as trigmm
-d  implements it; and, for
-d  comparison on the same data, Lewbel (2012), the Gaussian copula, the rank
-d  control function, and Oster (2019).
+d  implements it; and, for comparison on the same data, Lewbel (2012), the
+d  Gaussian copula, the rank control function, and Oster (2019).
 d
 d  Two endogenous variables sharing one latent confounder switch to the
 d  two-indicator model, where the confounder's direct loading is free and
