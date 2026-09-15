@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.16.4  15sep2026}{...}
+{* *! version 0.16.5  15sep2026}{...}
 {vieweralsosee "[R] ivregress" "help ivregress"}{...}
 {vieweralsosee "freeivmenu" "help freeivmenu"}{...}
 {vieweralsosee "freeivdiag" "help freeivdiag"}{...}
@@ -415,7 +415,9 @@ loading a1 in closed form, with no scale-consistency restriction at all.  That
 is what makes the restriction testable rather than assumed: the command
 reports a1 - (g2 a2 + g3 a3), which is identically zero under scale
 consistency and has a standard error here.  Three further statistics come with
-it -- the one-factor check R1 - R3, the J of the sixteen-moment GMM, and what
+it -- the one-factor check R1 - R3 (its ratio verdict is read only when both
+third-order cross-moments have z >= 2, since R2 and R3 divide by them), the J
+of the sixteen-moment GMM, and what
 Y3 would return if it were misused as an instrument for Y2, which it is not,
 being correlated with the very thing it would have to purge.  Model B is
 selected by the syntax alone: two variables inside the parentheses.  See
@@ -825,6 +827,7 @@ should{p_end}
 {synopt:{cmd:e(sc)}}g2 a2 + g3 a3, which is what model A would call a1{p_end}
 {synopt:{cmd:e(sc_d)}, {cmd:e(z_sc)}}the scale-consistency test{p_end}
 {synopt:{cmd:e(of_d)}, {cmd:e(z_of)}}the one-factor test{p_end}
+{synopt:{cmd:e(z_m223)}, {cmd:e(z_m233)}}the z of the two third-order cross-moments, mean over sd/sqrt(n) as {helpb freeivmenu} prints them; the one-factor ratio |R3/R1 - 1| is read only when both exceed 2{p_end}
 {synopt:{cmd:e(q_J)}, {cmd:e(q_pJ)}}the 16-moment GMM and its J with 4 df{p_end}
 {synopt:{cmd:e(guard)}}0, or the guard of Proposition 1 that fired{p_end}
 

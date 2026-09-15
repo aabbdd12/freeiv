@@ -1,4 +1,4 @@
-*! freeiv_mata 0.3.0  14sep2026  A. Araar
+*! freeiv_mata 0.3.1  15sep2026  A. Araar
 *! Mata engine of freeiv: residuals, moments of orders 2-3-4, the closed forms
 *! of model A (bounds, QME, SCE, RRE, HME, Q-BE) and the discriminant test.
 *! Kept in a separate file because an ado-file loaded automatically does not
@@ -1250,7 +1250,7 @@ void _freeiv_ptests(string scalar y1v, string scalar y2v, string scalar y3v,
     real colvector y1, y2, y3, w, e2, e3, xi, z
     real matrix    X, Xm, H, Q, Qi, P, Vm, D
     real rowvector mv, up, dn, gr
-    real scalar    n, sw, j, s, sc, ofv, vs, vo, ses, seo
+    real scalar    n, sw, j, s, sc, ofv, vs, vo, ses, seo, z223, z233
     string rowvector cn
 
     y1 = st_data(., y1v, tousev)
@@ -1319,12 +1319,22 @@ void _freeiv_ptests(string scalar y1v, string scalar y2v, string scalar y3v,
         }
     }
 
+    /* the z of the two third-order cross-moments, as freeivmenu prints
+       them: mean over sd/sqrt(n) of the product, sd with n - 1 as
+       -summarize- computes it.  The one-factor verdict is read only when
+       both exceed 2, since R2 and R3 divide by these moments */
+    vs = quadcross(w, (H[., 6] :- mv[6]):^2) / (n - 1)
+    z223 = (vs > 0 ? mv[6] / sqrt(vs / n) : .)
+    vs = quadcross(w, (H[., 7] :- mv[7]):^2) / (n - 1)
+    z233 = (vs > 0 ? mv[7] / sqrt(vs / n) : .)
+
     st_matrix("__freeiv_PT",
         (n, mv, sc, ses, (ses < . ? sc / ses : .),
-         ofv, seo, (seo < . ? ofv / seo : .)))
+         ofv, seo, (seo < . ? ofv / seo : .), z223, z233))
     cn = ("n", "t_m22", "t_m33", "t_m23", "t_mx2", "t_mx3", "t_m223",
           "t_m233", "t_mx23", "t_mx22", "t_mx33", "t_mxx2", "t_mxx3",
-          "sc_d", "se_sc", "z_sc", "of_d", "se_of", "z_of")
+          "sc_d", "se_sc", "z_sc", "of_d", "se_of", "z_of",
+          "z_m223", "z_m233")
     st_matrixcolstripe("__freeiv_PT", (J(cols(cn), 1, ""), cn'))
 }
 

@@ -1,4 +1,4 @@
-*! freeiv 0.8.1  15sep2026  A. Araar (Universite Laval / PEP)
+*! freeiv 0.8.2  15sep2026  A. Araar (Universite Laval / PEP)
 *! Instrument-free estimation: linear structural model with one endogenous
 *! regressor, identified through higher-order moments under the scale
 *! consistency restriction alpha1 = gamma1 * alpha2.
@@ -11,6 +11,9 @@
 *!          lewbel12 | copula | rank | rpiv | ape | oster       (literature)
 *!          all                                          (default: qme)
 *!
+*! 0.8.2 gates the one-factor ratio verdict of model B on the z of the two
+*! third-order cross-moments (both >= 2), the same z as freeivmenu prints,
+*! stored in e(z_m223), e(z_m233); R2 and R3 divide by those moments.
 *! 0.8.0 splits the GMM in two, because they are two estimators and only one
 *! of them is the paper's.
 *!
@@ -347,7 +350,7 @@ program define freeiv, eclass
         tempname PT
         matrix `PT' = __freeiv_PT
         matrix drop __freeiv_PT
-        local ptvals "n t_m22 t_m33 t_m23 t_mx2 t_mx3 t_m223 t_m233 t_mx23 t_mx22 t_mx33 t_mxx2 t_mxx3 sc_d se_sc z_sc of_d se_of z_of"
+        local ptvals "n t_m22 t_m33 t_m23 t_mx2 t_mx3 t_m223 t_m233 t_mx23 t_mx22 t_mx33 t_mxx2 t_mxx3 sc_d se_sc z_sc of_d se_of z_of z_m223 z_m233"
         local j = 0
         foreach v of local ptvals {
             local ++j
@@ -1047,8 +1050,16 @@ program define _freeiv_pident
     di as txt "    R2  from xi eps^2" _col(40) as res "`s'"
     _freeiv_fmt `=e(R3)'
     di as txt "    R3  from xi^2 eps" _col(40) as res "`s'"
+    * the ratio is read only when both third-order cross-moments are
+    * measured (z >= 2): R2 and R3 divide by them and are noise otherwise,
+    * which is the same gate as the menu applies
+    local weak3 = (abs(e(z_m223)) < 2 | abs(e(z_m233)) < 2 | e(z_m223) >= . | e(z_m233) >= .)
     di as txt "    |R3/R1 - 1|" _col(40) as res %10.4f e(disc_R) ///
-       cond(e(disc_R) < 0.15, "   consistent", "   a second factor is likely")
+       cond(`weak3', "   not informative", ///
+       cond(e(disc_R) < 0.15, "   consistent", "   a second factor is likely"))
+    di as txt "    z of eps2^2 eps3, eps2 eps3^2" _col(40) as res ///
+       %10.2f e(z_m223) "  " %8.2f e(z_m233) ///
+       as txt cond(`weak3', "   both must reach 2", "")
     di as txt "    With one factor all three equal a2/a3.  With two, R1 becomes"
     di as txt "    (a2^2 a3 E[U^3] + b2^2 b3 E[W^3]) / (a2 a3^2 E[U^3] +"
     di as txt "    b2 b3^2 E[W^3]), which is a2/a3 only if the second factor is"

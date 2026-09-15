@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 type: software
 title: "freeiv: Instrument-free estimation of a linear structural model"
-version: 0.8.1
+version: 0.8.2
 date-released: 2026-09-15
 license: MIT
 repository-code: "https://github.com/aabbdd12/freeiv"

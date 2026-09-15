@@ -117,16 +117,18 @@ loading in the outcome equation is left *free* and identified. That is what
 makes scale consistency itself testable rather than maintained.
 
 ```stata
+freeivmenu lwage exper black south smsa (educ motheduc)   // relevance, guards, skewness regime
 freeiv lwage exper black south smsa (educ motheduc)
 ```
 
-No method name is needed: the syntax alone selects it.
+No method name is needed: the syntax alone selects it, in the menu as in
+the estimator.
 
 ## Companion commands
 
 | command | what it does |
 |---|---|
-| `freeivmenu` | which routes the data can carry, **before** any estimation |
+| `freeivmenu` | which routes the data can carry, **before** any estimation; with two indicators, what the two-indicator model needs |
 | `freeivdiag` | what a given value of gamma implies about the unobservables, whatever produced it |
 | `freeivtest` | endogeneity, agreement between routes, and an outside estimate against the interval |
 | `freeivreport` | all of it in one table, with an optional CSV |
@@ -193,7 +195,7 @@ and `method(oster)` follows Oster (2019) as `psacalc` does.
 
 ```
 Araar, A. (2026). freeiv: Instrument-free estimation of a linear structural
-model. Stata package, version 0.8.1. https://github.com/aabbdd12/freeiv
+model. Stata package, version 0.8.2. https://github.com/aabbdd12/freeiv
 ```
 
 A `CITATION.cff` file is included for reference managers.
