@@ -35,6 +35,13 @@ ancillary files, so `net install` alone does not bring them down.
 
 Stata 16 or later. No dependencies.
 
+## Documentation
+
+`help freeiv` is the reference. `freeiv_paper.pdf`, in this repository and
+retrieved by `net get freeiv`, presents the models, the command and worked
+examples at article length, in the format of a Stata Journal article; the
+output it prints is that of the installed version.
+
 ## Quick start
 
 ```stata

@@ -45,6 +45,9 @@ d  Wooldridge's teaching datasets; on it a single endogenous regressor can only
 d  be bounded, while a second indicator of the same confounder identifies it,
 d  which is the argument of that paper on its own data.
 d
+d  freeiv_paper.pdf, also retrieved by net get, presents the models, the
+d  command and worked examples at article length.
+d
 d Requires: Stata version 16
 d
 d Distribution-Date: 20260915
@@ -69,4 +72,5 @@ f freeiv_card.dta
 f freeiv_sim1.dta
 f freeiv_sim2.dta
 f freeiv_proxy.dta
+f freeiv_paper.pdf
 e

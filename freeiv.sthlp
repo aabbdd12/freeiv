@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.16.2  15sep2026}{...}
+{* *! version 0.16.3  15sep2026}{...}
 {vieweralsosee "[R] ivregress" "help ivregress"}{...}
 {vieweralsosee "freeivmenu" "help freeivmenu"}{...}
 {vieweralsosee "freeivdiag" "help freeivdiag"}{...}
@@ -805,6 +805,16 @@ should{p_end}
 
 
 {marker references}{...}
+{title:Documentation}
+
+{pstd}
+{bf:freeiv_paper.pdf} presents the models, the command and worked examples at
+article length, in the format of a Stata Journal article.  It comes down
+with {cmd:net get freeiv}, next to the datasets, and is kept at
+{browse "https://github.com/aabbdd12/freeiv"}.  The output it prints is
+that of the installed version.
+
+
 {title:References}
 
 {phang}
