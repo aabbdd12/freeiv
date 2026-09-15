@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.16.0  14sep2026}{...}
+{* *! version 0.16.1  15sep2026}{...}
 {vieweralsosee "[R] ivregress" "help ivregress"}{...}
 {vieweralsosee "freeivmenu" "help freeivmenu"}{...}
 {vieweralsosee "freeivdiag" "help freeivdiag"}{...}
@@ -472,8 +472,9 @@ rather than ignored{p_end}
 
 {pstd}
 {bf:Standard errors.}  Seven routes return a point with no analytic variance:
-{cmd:bounds qbe lewbel12 copula rank rpiv ape oster}.  No confidence interval
-is printed for them, and {opt level()} therefore changes nothing in
+{cmd:qbe lewbel12 copula rank rpiv ape oster}; {cmd:bounds} returns no point at
+all.  No confidence interval is printed for them, and {opt level()} changes
+nothing in
 {cmd:freeiv}'s own output -- but it is still read by a {cmd:bootstrap:} or
 {cmd:jackknife:} prefix, which owns the coefficient table when one is used.
 The routes that do carry an analytic standard error are {cmd:ols qme sce rre
@@ -612,10 +613,12 @@ and the truth is still 0.40 -- yet the QME returns nothing at all{p_end}
 {pstd}
 The reason is exact rather than accidental.  The discriminant of the quadratic
 is D = gamma^2 (2A - B)^2, with A = alpha2^3 E[U^3] and B = E[V2^3], so it
-vanishes when B = 2A.  Here alpha2 = 0.80 and both U and V2 have third moment
-1.6365, giving A = 0.8379 and B = 1.6365: 2A - B is 0.039 rather than zero,
-and the population discriminant is 0.0002 against 0.449 in
-{cmd:freeiv_sim1.dta}.  This design sits, by construction, almost exactly on
+vanishes when B = 2A.  A standardised chi2(3) has third moment
+24/6^(3/2) = 4/sqrt(6) = 1.6330, so with alpha2 = 0.80 and U and V2 drawn from
+that same law, A = 0.8^3 x 1.6330 = 0.8361 and B = 1.6330: 2A - B is 0.0392
+rather than zero, and the population discriminant is 0.00025 against 0.447 in
+{cmd:freeiv_sim1.dta}, where V2 is normal and B is zero.  This design sits, by
+construction, almost exactly on
 the surface where the two roots merge, and in any one sample D lands on either
 side of zero.
 
