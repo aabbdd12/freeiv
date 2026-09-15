@@ -46,7 +46,8 @@ d  be bounded, while a second indicator of the same confounder identifies it,
 d  which is the argument of that paper on its own data.
 d
 d  freeiv_paper.pdf, also retrieved by net get, presents the models, the
-d  command and worked examples at article length.
+d  command and worked examples at article length; it is archived at
+d  doi:10.5281/zenodo.22770175 and is the reference to cite for the package.
 d
 d Requires: Stata version 16
 d

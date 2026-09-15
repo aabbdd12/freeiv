@@ -40,7 +40,8 @@ Stata 16 or later. No dependencies.
 `help freeiv` is the reference. [`freeiv_paper.pdf`](freeiv_paper.pdf), in this
 repository and retrieved by `net get freeiv`, presents the models, the command and worked
 examples at article length, in the format of a Stata Journal article; the
-output it prints is that of the installed version.
+output it prints is that of the installed version. It is archived on Zenodo:
+[10.5281/zenodo.22770175](https://doi.org/10.5281/zenodo.22770175).
 
 ## Quick start
 
@@ -195,10 +196,12 @@ and `method(oster)` follows Oster (2019) as `psacalc` does.
 
 ```
 Araar, A. (2026). freeiv: Instrument-free estimation of a linear structural
-model. Stata package, version 0.8.2. https://github.com/aabbdd12/freeiv
+model with an endogenous regressor. Zenodo. https://doi.org/10.5281/zenodo.22770175
 ```
 
-A `CITATION.cff` file is included for reference managers.
+That reference is the documentation paper; the package itself is version
+0.8.2 at https://github.com/aabbdd12/freeiv. A `CITATION.cff` file is
+included for reference managers.
 
 ## Author
 

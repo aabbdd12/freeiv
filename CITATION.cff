@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "If you use this software, please cite the documentation paper (preferred-citation below)."
 type: software
 title: "freeiv: Instrument-free estimation of a linear structural model"
 version: 0.8.2
@@ -11,6 +11,16 @@ authors:
     given-names: Abdelkrim
     affiliation: "Université Laval and Partnership for Economic Policy (PEP)"
     email: aabd@ecn.ulaval.ca
+preferred-citation:
+  type: report
+  title: "freeiv: Instrument-free estimation of a linear structural model with an endogenous regressor"
+  authors:
+    - family-names: Araar
+      given-names: Abdelkrim
+  year: 2026
+  publisher:
+    name: Zenodo
+  doi: 10.5281/zenodo.22770175
 keywords:
   - Stata
   - endogeneity

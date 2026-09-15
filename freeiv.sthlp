@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.16.5  15sep2026}{...}
+{* *! version 0.16.6  15sep2026}{...}
 {vieweralsosee "[R] ivregress" "help ivregress"}{...}
 {vieweralsosee "freeivmenu" "help freeivmenu"}{...}
 {vieweralsosee "freeivdiag" "help freeivdiag"}{...}
@@ -846,7 +846,9 @@ should{p_end}
 article length, in the format of a Stata Journal article.  It comes down
 with {cmd:net get freeiv}, next to the datasets, and is kept at
 {browse "https://github.com/aabbdd12/freeiv"}.  The output it prints is
-that of the installed version.
+that of the installed version.  To cite the package, cite that paper:
+Araar, A. 2026.  freeiv: Instrument-free estimation of a linear structural
+model with an endogenous regressor.  Zenodo 10.5281/zenodo.22770175.
 
 
 {title:References}
