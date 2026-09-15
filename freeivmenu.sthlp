@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.8.0  13sep2026}{...}
+{* *! version 0.9.0  15sep2026}{...}
 {vieweralsosee "freeiv" "help freeiv"}{...}
 {vieweralsosee "freeivdiag" "help freeivdiag"}{...}
 {vieweralsosee "freeivtest" "help freeivtest"}{...}
@@ -14,7 +14,7 @@
 {p 8 17 2}
 {cmd:freeivmenu} {depvar} [{indepvars}] {cmd:(}{it:endogvar}{cmd:)}
 {ifin} {weight}
-[{cmd:, quantile(}{it:#}{cmd:)}]
+[{cmd:, quantile(}{it:#}{cmd:)} {cmd:bw(}{it:#}{cmd:)}]
 
 {p 4 6 2}{it:fweight}s, {it:pweight}s and {it:aweight}s are allowed.{p_end}
 
@@ -52,6 +52,24 @@ statement about the model: k moves when either variable is rescaled.{p_end}
 {cmd:lewbel12} needs.  When it is absent, that route returns noise -- and
 {cmd:ivreg2h} says the same thing in its own language, through a small
 Cragg-Donald F.{p_end}
+{p2col:{bf:local slope profile}}the kernel-weighted slope of xi on eps2 at
+seven percentiles of eps2 -- the local-linear estimate of the derivative of
+E[xi | eps2].  In the one-factor model that derivative is
+gamma + alpha1 m'(s) with m(s) = E[U | eps2 = s].  If the confounder is
+Gaussian-like, m is linear and the profile is {it:flat} at gamma-tilde: the
+third-order routes will find little.  If it is skewed, m is curved and the
+profile moves -- but a non-linear outcome equation curves it too, so a
+curved profile says which of the two is in play only in conjunction with
+the other lines.  Two readings are exact in the limit.  When m is
+increasing (log-concave densities suffice) the {it:minimum} of the profile
+is an upper bound on gamma tighter than gamma-tilde, with no assumption on
+the law; "tightens" is printed when it beats gamma-tilde by more than
+1.96 standard errors.  And the ratio of the two tail slopes tends to
+1 + alpha1/(gamma alpha2), which is 2 under scale consistency; it is
+informative only when one tail of eps2 is dominated by U and the other by
+V2, as with a bounded or strongly skewed confounder, and it converges
+slowly.  The bandwidth is h = 2 * 1.06 * sd(eps2) * N^(-1/5) unless
+{opt bw()} is given.{p_end}
 {p2col:{bf:two indicators}}a reminder that a second indicator of the same
 confounder, if one exists, opens model B and with it the only direct test of
 scale consistency.  Model B is selected by the syntax alone -- two variables
@@ -70,6 +88,11 @@ neither is possible; that case is visible here and nowhere else.
 
 {phang}
 {opt quantile(#)} is passed through to the Q-BE diagnostics; default 0.25.
+
+{phang}
+{opt bw(#)} sets the kernel bandwidth of the local slope profile, in the
+units of eps2; the default is 2 * 1.06 * sd(eps2) * N^(-1/5).  A larger
+bandwidth gives a smoother, more precise and more biased profile.
 
 
 {title:Examples}
@@ -97,7 +120,10 @@ lands outside its own identified set{p_end}
 including {cmd:r(z_m03)}, {cmd:r(F_lewbel)}, {cmd:r(p_lewbel)},
 {cmd:r(lo)}, {cmd:r(hi)}, {cmd:r(k)}, {cmd:r(kstar)}, {cmd:r(A)}, {cmd:r(B)},
 {cmd:r(mu)}, {cmd:r(disc)}, {cmd:r(disc_z)}, and the matrix
-{cmd:r(moments)}.
+{cmd:r(moments)}.  The local slope profile is returned as the 7 x 3 matrix
+{cmd:r(profile)} (evaluation point, slope, standard error, rows p5 to p95),
+with {cmd:r(prof_h)}, {cmd:r(prof_min)}, {cmd:r(prof_minse)},
+{cmd:r(prof_ratio)} and {cmd:r(prof_z)}.
 
 
 {title:Author}

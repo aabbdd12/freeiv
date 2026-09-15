@@ -1,10 +1,17 @@
-*! freeivmenu 0.2.0  13sep2026  A. Araar (Universite Laval / PEP)
+*! freeivmenu 0.3.0  15sep2026  A. Araar (Universite Laval / PEP)
 *! The identification menu: before any estimation, what these data can carry.
 *! One line per family of strategies, with the signal it needs, its value, and
 *! a verdict.
 *!
 *!   freeivmenu depvar [indepvars] (endogvar) [if] [in] [fw pw aw]
-*!              [, QUANtile(#) ]
+*!              [, QUANtile(#) BW(#) ]
+*!
+*! 0.3.0 adds the local slope profile of E[xi | eps2]: the kernel-weighted
+*! slope of xi on eps2 at seven percentiles of eps2.  Flat means Gaussian-
+*! like (the third order will find little); its minimum is an upper bound
+*! on gamma when E[U | eps2] is increasing; the ratio of the two tail slopes
+*! tends to 1 + alpha1/(gamma alpha2), i.e. 2 under scale consistency.
+*! Reference: python/freeiv/profile.py, values in python/export_profile.txt.
 *!
 *! Every displayed statistic is returned in r().
 
@@ -14,7 +21,7 @@ cap program drop _fivm_verdict
 program define freeivmenu, rclass
     version 16
     syntax anything(name=eqs equalok) [if] [in] [fw pw aw] ///
-        [, QUANtile(real 0.25) ]
+        [, QUANtile(real 0.25) BW(real -1) ]
 
     local p1 = strpos("`eqs'", "(")
     local p2 = strpos("`eqs'", ")")
@@ -110,6 +117,56 @@ program define freeivmenu, rclass
     local se_m03 = r(sd) / sqrt(`N')
     local z_m03  = cond(`se_m03' > 0, `m03' / `se_m03', .)
 
+    * ---- local slope profile of E[xi | eps2] ------------------------------
+    * Gaussian kernel, h = 2 * 1.06 * sd(eps2) * N^(-1/5) unless bw() is given;
+    * -regress [aw=kw], vce(robust)- is exactly the kernel-weighted local
+    * linear slope with the HC1 sandwich the Python reference computes.
+    qui summarize `e2' `wexp2' if `touse'
+    local h = cond(`bw' > 0, `bw', 2 * 1.06 * r(sd) * `N'^(-0.2))
+    local probs "5 10 25 50 75 90 95"
+    _pctile `e2' `wexp2' if `touse', p(`probs')
+    forvalues j = 1/7 {
+        local q`j' = r(r`j')
+    }
+    tempname P
+    matrix `P' = J(7, 3, .)
+    tempvar kw
+    forvalues j = 1/7 {
+        qui gen double `kw' = exp(-0.5 * ((`e2' - `q`j'') / `h')^2) if `touse'
+        if ("`wname'" != "") qui replace `kw' = `kw' * `wname' if `touse'
+        cap qui regress `xi' `e2' [aw = `kw'] if `touse', vce(robust)
+        if (_rc == 0) {
+            matrix `P'[`j', 1] = `q`j''
+            matrix `P'[`j', 2] = _b[`e2']
+            matrix `P'[`j', 3] = _se[`e2']
+        }
+        drop `kw'
+    }
+    matrix colnames `P' = eps2 slope se
+    matrix rownames `P' = p5 p10 p25 p50 p75 p90 p95
+    local pmin = .
+    local jmin = 0
+    local jmax = 0
+    local pmax = .
+    forvalues j = 1/7 {
+        local b = `P'[`j', 2]
+        if (`b' < . & (`pmin' >= . | `b' < `pmin')) {
+            local pmin = `b'
+            local jmin = `j'
+        }
+        if (`b' < . & (`pmax' >= . | `b' > `pmax')) {
+            local pmax = `b'
+            local jmax = `j'
+        }
+    }
+    local pmin_se = cond(`jmin' > 0, `P'[`jmin', 3], .)
+    local pmax_se = cond(`jmax' > 0, `P'[`jmax', 3], .)
+    local pratio  = cond(`P'[1, 2] != 0 & `P'[1, 2] < ., `P'[7, 2] / `P'[1, 2], .)
+    local pz      = cond(`pmin_se' < . & `pmax_se' < ., ///
+                    (`pmax' - `pmin') / sqrt(`pmax_se'^2 + `pmin_se'^2), .)
+    local pnames "5 10 25 50 75 90 95"
+    local pmin_p : word `jmin' of `pnames'
+
     * ================= display ============================================
     di
     di as txt "Identification menu: what these data can carry"
@@ -187,7 +244,22 @@ program define freeivmenu, rclass
     else di as txt %-22s "heteroskedasticity:" %-28s "no exogenous control" ///
          as res %10s "." as txt "  unavailable"
 
-    * 7. proxy ---------------------------------------------------------------
+    * 7. local slope profile --------------------------------------------------
+    di as txt %-22s "local slope profile" %-28s "slope of xi on eps2 at p5" ///
+       as res %10.4f `P'[1, 2] as txt "  h = " %5.3f `h'
+    di as txt %-22s "  of E[xi | eps2]" %-28s "p10 / p25 / p50" ///
+       as res %7.4f `P'[2, 2] " " %7.4f `P'[3, 2] " " %7.4f `P'[4, 2]
+    di as txt %-22s "" %-28s "p75 / p90 / p95" ///
+       as res %7.4f `P'[5, 2] " " %7.4f `P'[6, 2] " " %7.4f `P'[7, 2]
+    di as txt %-22s "" %-28s "curvature z (max-min)" as res %10.2f `pz' ///
+       as txt cond(`pz' >= 2 & `pz' < ., "  curved", cond(`pz' < ., "  flat", ""))
+    local tight = cond(`pmin' + 1.96 * `pmin_se' < `hi', "tightens", "no tightening")
+    di as txt %-22s "" %-28s "min slope, at p`pmin_p'" as res %10.4f `pmin' ///
+       as txt "  `tight'"
+    di as txt %-22s "" %-28s "tail ratio p95/p5" as res %10.2f `pratio' ///
+       as txt cond(`pratio' < ., cond(abs(`pratio' - 2) < 0.5, "  near 2", "  not 2"), "")
+
+    * 8. proxy ---------------------------------------------------------------
     di as txt %-22s "two indicators" %-28s "freeiv y1 x (y2 y3)" ///
        as res %10s "." as txt "  by syntax"
 
@@ -197,12 +269,23 @@ program define freeivmenu, rclass
     di as txt "not make an estimator wrong, it makes it imprecise."
     di as txt "B = 0 and k* = 1 are restrictions on the model; k = 1 is a restriction"
     di as txt "on the units, which is why the sce is reported below the rre."
+    di as txt "The slope profile is flat when the confounder is Gaussian-like; its"
+    di as txt "minimum bounds gamma from above when E[U|eps2] is increasing, and the"
+    di as txt "tail ratio tends to 2 under scale consistency.  A curved profile is"
+    di as txt "a skewed confounder or a non-linear outcome equation: it does not say"
+    di as txt "which."
 
     * ---- r() ---------------------------------------------------------------
     foreach v of local vals {
         return scalar `v' = ``v''
     }
     return scalar z_m03 = `z_m03'
+    return scalar prof_h     = `h'
+    return scalar prof_min   = `pmin'
+    return scalar prof_minse = `pmin_se'
+    return scalar prof_ratio = `pratio'
+    return scalar prof_z     = `pz'
+    return matrix profile = `P'
     return scalar F_lewbel = `F_lew'
     return scalar p_lewbel = `p_lew'
     return matrix moments = `M'
