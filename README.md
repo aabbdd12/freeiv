@@ -136,46 +136,11 @@ none is a black box.
 | `freeiv_proxy` | two endogenous regressors loading on one confounder |
 | `freeiv_card` | the Card (1995) extract of Araar (2026d) — one endogenous regressor can only be bounded there, while a second indicator identifies it |
 
-## What else is in this repository
-
-The installable files sit at the root, where `net install` expects to find
-them. Everything that produced them is kept alongside, on the view that a
-method's claims are only as good as the evidence you can inspect.
-
-```
-*.ado  *.sthlp  *.dlg  freeiv.pkg  stata.toc  *.dta    the package itself
-src/        the same ado-files as sources, and every test do-file
-python/     the reference library the ado follows, and the papers' own code
-logs/       the Stata logs those tests produced, as produced
-data/       the datasets, including the six LSZ test-bench simulations
-papers/     the papers of the series
-notes/      the plan, the working notes and the correction notes
-```
-
-[`DEVELOPMENT.md`](DEVELOPMENT.md) is the brick-by-brick record: what each
-step added and what it was checked against.
-
-### Which test file proves what
-
-| do-file | what it establishes |
-|---|---|
-| `freeiv_test1.do` | the closed forms of model A against the Python library, figure by figure |
-| `freeiv_boot.do` | the analytic standard errors against a 400-replication bootstrap |
-| `freeiv_test3.do` | `freeivmenu` and `freeivdiag` |
-| `freeiv_test4.do` | model B, the two-indicator closed form and its guards |
-| `freeiv_test5.do` | the literature routes against `ivreg2h` and `psacalc` |
-| `freeiv_test6.do`, `freeiv_test6b.do` | the profiled GMM, and `lsz` against `trigmm` |
-| `freeiv_test7.do` | the three statistics of model B, and that they separate |
-| `freeiv_test8.do`, `freeiv_test8b.do` | the package, installed and run from the installed copy |
-| `freeiv_test9.do` | factor variables and twenty refusals |
-| `freeiv_test10.do` | every example the help prints, and Table 6 of Araar (2026d) |
-| `freeiv_test11.do` | `method(gmm)` against Table 4 of Araar (2026c), row by row |
-
-### Reference commands, not redistributed
+## Reference commands, not redistributed
 
 The package was validated against three published commands. They are not in
 this repository, because they are not ours to license. Install them yourself
-to repeat those checks:
+to compare:
 
 - `trigmm` — `ssc install trigmm`, or `st0797` from
   http://www.stata-journal.com/software/sj26-1: the reference for
@@ -183,9 +148,8 @@ to repeat those checks:
 - `ivreg2h` (SSC): the reference for `method(lewbel12)`
 - `psacalc` (SSC): the reference for `method(oster)`
 
-`freeiv_test5.do` and `freeiv_test6b.do` then reproduce the agreement:
-`lewbel12` equals `ivreg2h` to six decimals, `oster` equals `psacalc` to
-five, and `lsz` matches `trigmm` to ten.
+On the same data, `lewbel12` equals `ivreg2h` to six decimals, `oster`
+equals `psacalc` to five, and `lsz` matches `trigmm` to ten.
 
 ## Papers
 
@@ -202,10 +166,9 @@ Zenodo.
   Scale-Consistency: Closed-Form Identification, Partial Bounds, and
   Higher-Moment GMM.*
   [10.5281/zenodo.22753299](https://doi.org/10.5281/zenodo.22753299)
-- Araar, A. (2026d). *One Proxy Is Enough: Closed-Form Identification of
-  Triangular Systems with a Latent Confounder, Without Instruments or
-  Exclusion Restrictions.*
-  [10.5281/zenodo.22207332](https://doi.org/10.5281/zenodo.22207332)
+- Araar, A. (2026d). *Two Indicators of One Latent Confounder: Closed-Form
+  Identification of the Triangular Model with a Free Proxy Effect.*
+  [10.5281/zenodo.22764001](https://doi.org/10.5281/zenodo.22764001)
 
 `method(lewbel12)` follows Lewbel (2012) as `ivreg2h` implements it,
 `method(lsz)` follows Lewbel, Schennach and Zhang (2024) as `trigmm` does,
@@ -215,8 +178,10 @@ and `method(oster)` follows Oster (2019) as `psacalc` does.
 
 ```
 Araar, A. (2026). freeiv: Instrument-free estimation of a linear structural
-model. Statistical Software Components, Boston College.
+model. Stata package, version 0.8.1. https://github.com/aabbdd12/freeiv
 ```
+
+A `CITATION.cff` file is included for reference managers.
 
 ## Author
 

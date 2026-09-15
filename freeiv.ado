@@ -1,4 +1,4 @@
-*! freeiv 0.8.0  14sep2026  A. Araar (Universite Laval / PEP)
+*! freeiv 0.8.1  15sep2026  A. Araar (Universite Laval / PEP)
 *! Instrument-free estimation: linear structural model with one endogenous
 *! regressor, identified through higher-order moments under the scale
 *! consistency restriction alpha1 = gamma1 * alpha2.
@@ -109,7 +109,7 @@
 *! standard error: use the bootstrap prefix.
 *!
 *! Reference: Araar, A. (2026), Zenodo 10.5281/zenodo.22067980,
-*! 22068143, 22753299, 22207332.
+*! 22068143, 22753299, 22764001.
 
 cap program drop freeiv
 cap program drop _freeiv_display

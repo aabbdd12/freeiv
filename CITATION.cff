@@ -1,0 +1,49 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "freeiv: Instrument-free estimation of a linear structural model"
+version: 0.8.1
+date-released: 2026-09-15
+license: MIT
+repository-code: "https://github.com/aabbdd12/freeiv"
+authors:
+  - family-names: Araar
+    given-names: Abdelkrim
+    affiliation: "Université Laval and Partnership for Economic Policy (PEP)"
+    email: aabd@ecn.ulaval.ca
+keywords:
+  - Stata
+  - endogeneity
+  - instrument-free identification
+  - higher-order moments
+  - latent confounder
+  - scale consistency
+references:
+  - type: report
+    title: "Correcting Endogeneity without External Instruments: Four Closed-Form Estimators for the Linear Structural Model"
+    authors:
+      - family-names: Araar
+        given-names: Abdelkrim
+    year: 2026
+    doi: 10.5281/zenodo.22067980
+  - type: report
+    title: "The Quadratic Moment Estimator for Instrument-Free Endogeneity Correction"
+    authors:
+      - family-names: Araar
+        given-names: Abdelkrim
+    year: 2026
+    doi: 10.5281/zenodo.22068143
+  - type: report
+    title: "Instrument-Free Estimation under Linear Scale-Consistency: Closed-Form Identification, Partial Bounds, and Higher-Moment GMM"
+    authors:
+      - family-names: Araar
+        given-names: Abdelkrim
+    year: 2026
+    doi: 10.5281/zenodo.22753299
+  - type: report
+    title: "Two Indicators of One Latent Confounder: Closed-Form Identification of the Triangular Model with a Free Proxy Effect"
+    authors:
+      - family-names: Araar
+        given-names: Abdelkrim
+    year: 2026
+    doi: 10.5281/zenodo.22764001

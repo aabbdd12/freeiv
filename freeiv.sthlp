@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.16.1  15sep2026}{...}
+{* *! version 0.16.2  15sep2026}{...}
 {vieweralsosee "[R] ivregress" "help ivregress"}{...}
 {vieweralsosee "freeivmenu" "help freeivmenu"}{...}
 {vieweralsosee "freeivdiag" "help freeivdiag"}{...}
@@ -820,7 +820,9 @@ Araar, A. 2026c.  Instrument-free estimation under linear scale-consistency.
 Zenodo 10.5281/zenodo.22753299.
 
 {phang}
-Araar, A. 2026d.  One proxy is enough.  Zenodo 10.5281/zenodo.22207332.
+Araar, A. 2026d.  Two indicators of one latent confounder: closed-form
+identification of the triangular model with a free proxy effect.
+Zenodo 10.5281/zenodo.22764001.
 
 {phang}
 Card, D. 1995.  Using geographic variation in college proximity to estimate
