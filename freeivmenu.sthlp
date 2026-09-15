@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.9.0  15sep2026}{...}
+{* *! version 0.9.1  15sep2026}{...}
 {vieweralsosee "freeiv" "help freeiv"}{...}
 {vieweralsosee "freeivdiag" "help freeivdiag"}{...}
 {vieweralsosee "freeivtest" "help freeivtest"}{...}
@@ -63,8 +63,11 @@ curved profile says which of the two is in play only in conjunction with
 the other lines.  Two readings are exact in the limit.  When m is
 increasing (log-concave densities suffice) the {it:minimum} of the profile
 is an upper bound on gamma tighter than gamma-tilde, with no assumption on
-the law; "tightens" is printed when it beats gamma-tilde by more than
-1.96 standard errors.  And the ratio of the two tail slopes tends to
+the law; "tightens" is printed when the minimum sits at p5 or p10 -- the
+rising profile an increasing m implies -- and beats gamma-tilde by more
+than 1.96 standard errors.  An interior minimum is reported as
+"interior min": the profile is not monotone, the bound reading does not
+apply, and a non-linear outcome equation is the first thing to suspect.  And the ratio of the two tail slopes tends to
 1 + alpha1/(gamma alpha2), which is 2 under scale consistency; it is
 informative only when one tail of eps2 is dominated by U and the other by
 V2, as with a bounded or strongly skewed confounder, and it converges

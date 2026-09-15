@@ -1,4 +1,4 @@
-*! freeivmenu 0.3.0  15sep2026  A. Araar (Universite Laval / PEP)
+*! freeivmenu 0.3.1  15sep2026  A. Araar (Universite Laval / PEP)
 *! The identification menu: before any estimation, what these data can carry.
 *! One line per family of strategies, with the signal it needs, its value, and
 *! a verdict.
@@ -253,7 +253,10 @@ program define freeivmenu, rclass
        as res %7.4f `P'[5, 2] " " %7.4f `P'[6, 2] " " %7.4f `P'[7, 2]
     di as txt %-22s "" %-28s "curvature z (max-min)" as res %10.2f `pz' ///
        as txt cond(`pz' >= 2 & `pz' < ., "  curved", cond(`pz' < ., "  flat", ""))
-    local tight = cond(`pmin' + 1.96 * `pmin_se' < `hi', "tightens", "no tightening")
+    * the bound reading needs a rising profile (m increasing): the minimum
+    * must sit at p5 or p10.  An interior minimum is reported as such.
+    local tight = cond(`jmin' > 2, "interior min", ///
+        cond(`pmin' + 1.96 * `pmin_se' < `hi', "tightens", "no tightening"))
     di as txt %-22s "" %-28s "min slope, at p`pmin_p'" as res %10.4f `pmin' ///
        as txt "  `tight'"
     di as txt %-22s "" %-28s "tail ratio p95/p5" as res %10.2f `pratio' ///
