@@ -37,8 +37,8 @@ Stata 16 or later. No dependencies.
 
 ## Documentation
 
-`help freeiv` is the reference. `freeiv_paper.pdf`, in this repository and
-retrieved by `net get freeiv`, presents the models, the command and worked
+`help freeiv` is the reference. [`freeiv_paper.pdf`](freeiv_paper.pdf), in this
+repository and retrieved by `net get freeiv`, presents the models, the command and worked
 examples at article length, in the format of a Stata Journal article; the
 output it prints is that of the installed version.
 
@@ -60,6 +60,9 @@ route to bind — that is, which of the assumptions below you are entitled to
 make.
 
 ## The routes
+
+Section 2 of [`freeiv_paper.pdf`](freeiv_paper.pdf) states each model — what it
+assumes, what it identifies, and how the command estimates it.
 
 | `method()` | what it adds to scale consistency |
 |---|---|
@@ -157,6 +160,11 @@ to compare:
 
 On the same data, `lewbel12` equals `ivreg2h` to six decimals, `oster`
 equals `psacalc` to five, and `lsz` matches `trigmm` to ten.
+
+What each comparison route maintains in place of the model, and why an
+estimate from one of them can fall outside the identified interval, is set
+out in Section 2.5 and Table 2 of [`freeiv_paper.pdf`](freeiv_paper.pdf); the
+Card example in Section 4.3 shows four of the six doing exactly that.
 
 ## Papers
 
