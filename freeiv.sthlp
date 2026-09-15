@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.16.3  15sep2026}{...}
+{* *! version 0.16.4  15sep2026}{...}
 {vieweralsosee "[R] ivregress" "help ivregress"}{...}
 {vieweralsosee "freeivmenu" "help freeivmenu"}{...}
 {vieweralsosee "freeivdiag" "help freeivdiag"}{...}
@@ -532,6 +532,37 @@ say whether the LSZ solver reached its root; {cmd:e(guard)} says whether a
 guard of Proposition 1 fired in model B.  A collinear expansion of the
 controls is absorbed rather than fatal, the projection being computed with a
 generalized inverse.
+
+
+{title:What the third order cannot tell apart}
+
+{pstd}
+One caveat applies to every instrument-free route, not only to these.  In
+the single-indicator model the three third-order moments serve three
+unknowns (gamma, A, B): the system is just-identified, so any triple
+(m03, m12, m21) can be rationalised by a confounder, and a mechanism with no
+confounder at all produces the same triple.  Take y1 = a*y2 + b*y2^2 + e with
+y2 standard normal, e independent and no latent factor.  Then m03 = 0,
+m12 = 2b, m21 = 4ab, and the QME quadratic reduces to -6b*gamma + 4ab = 0:
+{cmd:method(qme)} returns 2a/3 for every b other than zero -- a correction of
+one third of the OLS slope that does not depend on the size of the quadratic
+term, lies inside the interval, has a positive discriminant, and implies a
+confounder share of one half with positive variances.  Nothing at order
+three can object, because nothing at order three is over-identified.
+
+{pstd}
+The fourth order can: on that design with b = 0.1 and n = 20,000 the J of
+{cmd:method(pgmm)} is 14 and that of {cmd:method(gmm)} is 5.4, both
+rejecting.  But the power of the test falls with b^2 and with n while the
+bias does not: at b = 0.02 the J is 0.2 and the estimate is still 0.70.  So
+read the z of the discriminant in {helpb freeivmenu} as the strength of a
+third-order signal, not as its source: a curvature in E[xi | eps2] is what a
+skewed confounder and a non-linear outcome equation both produce, and a
+RESET-type check on eps2^2 rejects under either.  The two-indicator model is
+the least exposed route, because its loading layer never reads y1.  And a
+valid external instrument, where one exists, is the only thing that
+identifies gamma with no assumption on the form of the outcome equation:
+an instrument-free route complements one, it does not replace it.
 
 
 {marker examples}{...}
