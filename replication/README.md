@@ -3,7 +3,8 @@
 `freeiv_paper/freeiv_note.do` reproduces every output and every number of the
 paper of the command, *freeiv: Instrument-free estimation of a linear
 structural model with an endogenous regressor* (`paper/freeiv_paper.pdf`;
-Zenodo, <https://doi.org/10.5281/zenodo.22770175>, all versions): each `stlog`
+version 1.0.0 on Zenodo, <https://doi.org/10.5281/zenodo.23190841>; all
+versions, <https://doi.org/10.5281/zenodo.22770175>): each `stlog`
 block of the paper is an excerpt of its log, commands included, at the paper's
 line width, and each number quoted in the text is printed by it.
 

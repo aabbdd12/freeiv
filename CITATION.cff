@@ -18,11 +18,15 @@ preferred-citation:
     - family-names: Araar
       given-names: Abdelkrim
   year: 2026
+  version: 1.0.0
   publisher:
     name: Zenodo
-  doi: 10.5281/zenodo.22770175
-  url: "https://doi.org/10.5281/zenodo.22770175"
-  notes: "Concept DOI: all versions of the paper, resolving to the latest."
+  doi: 10.5281/zenodo.23190841
+  url: "https://doi.org/10.5281/zenodo.23190841"
+  identifiers:
+    - type: doi
+      value: 10.5281/zenodo.22770175
+      description: "All versions of the paper (resolves to the latest)"
 keywords:
   - Stata
   - endogeneity

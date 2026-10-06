@@ -29,10 +29,12 @@ linearization over a survey design.
 The models, the command and worked examples are presented in
 
 > Araar, A. (2026). *freeiv: Instrument-free estimation of a linear structural
-> model with an endogenous regressor*. Zenodo.
-> <https://doi.org/10.5281/zenodo.22770175> (all versions)
+> model with an endogenous regressor* (Version 1.0.0). Zenodo.
+> <https://doi.org/10.5281/zenodo.23190841>
 
 which is [`paper/freeiv_paper.pdf`](paper/freeiv_paper.pdf) in this repository.
+All versions of the paper: <https://doi.org/10.5281/zenodo.22770175> (always the
+latest).
 
 ## Installation
 
@@ -166,10 +168,13 @@ concept DOI (all versions, resolving to the latest):
 
 ```
 Araar, A. (2026). freeiv: Instrument-free estimation of a linear structural
-model with an endogenous regressor. Zenodo. https://doi.org/10.5281/zenodo.22770175
+model with an endogenous regressor (Version 1.0.0). Zenodo.
+https://doi.org/10.5281/zenodo.23190841
 ```
 
-A `CITATION.cff` file is included for reference managers.
+To cite all versions, use <https://doi.org/10.5281/zenodo.22770175>, which
+always resolves to the latest. A `CITATION.cff` file is included for reference
+managers.
 
 ## Versions
 
