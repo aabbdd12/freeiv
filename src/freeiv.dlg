@@ -1,8 +1,17 @@
 /*
-	freeiv.dlg  0.18.0  14sep2026  A. Araar (Universite Laval / PEP)
+	freeiv.dlg  1.0.0  06oct2026  A. Araar (Universite Laval / PEP)
 
 	Dialog for -freeiv-: instrument-free estimation of a linear structural
 	model.
+
+	1.0.0 follows freeiv 1.0.0.  The estimators are listed in the order of
+	the command: the interval (bounds, then ols, its upper end), order 3
+	(qme, the default, then hme), order 4 (gmm, then pgmm), the other
+	maintained models (lsz, lewbel12, copula, rank, oster), all.  The
+	routes sce, rre, qbe, rpiv and ape are gone, and with qbe its
+	quantile() box; fweights are gone; the Weights tab gains vce(svy),
+	which takes the weights from svyset and so disables the weight
+	controls when it is ticked.
 
 	Self-contained on purpose.  Version 0.8.0 borrowed -byifin-,
 	-weights_fpa-, -_ifin_pr-, -_weights_pr- and -_level_pr- from the
@@ -13,44 +22,34 @@
 	are written out in full.  A dialog that borrows anything else breaks the
 	day the command it borrowed from changes.
 
-	0.14.0: the Estimator options tab follows the estimator.  quantile()
-	belongs to the Q-BE, delta() and rmax() to Oster, sign() to LSZ; every
-	other route takes none of them, and the default qme takes none at all.
-	onselchangelist(methacts) maps each of the seventeen entries of -methods-
-	to the program that shows the one group box that applies and hides the
-	rest.  Each program both shows/hides and enables/disables: the first is
-	what the user sees, the second is what stops the option reaching the
-	command line, so -PROGRAM command- no longer guards them a second time.
-	The control state is now the single statement of which option applies.
+	The Estimator options tab follows the estimator: delta() and rmax()
+	belong to Oster, sign() to LSZ; every other route takes none of them,
+	and the default qme takes none at all.  onselchangelist(methacts) maps
+	each entry of -methods- to the script that shows the group box that
+	applies and hides the rest.  Visibility and emission are kept apart:
+	the scripts hide and show, and PROGRAM command decides what is written
+	from the combobox itself (main.cb_m.iseq(), as esreg.dlg does), so
+	that a dialog filled in by freeiv_examples writes the right options
+	whether or not the scripts ran.
 
-	Ticking the two-indicator box hides all three.  A program cannot read
+	The dialog writes the command a user would type, the one the examples
+	of help freeiv list (freeiv_examples fills it in, and OK must run the
+	same command as the example's link in the command window): the
+	estimator's default is the value qme, as the official dialogs give a
+	combobox's default (betareg.dlg: default(logit)), and /hidedefault keeps
+	method(qme) off the command line; the weights are written [pweight=w].
+
+	Ticking the two-indicator box hides both boxes.  A program cannot read
 	the value of a combobox, so unticking returns the tab to the "no
 	option" state -- which is the state of the default estimator; picking
 	a method again restores its box.
 
-	0.10.0: the endogenous side is two VARNAME boxes rather than one
-	VARLIST, so "one variable, or two of them" is enforced by the controls
-	instead of being a caption the user has to read.
-
-	0.11.3 / 0.11.4: the Oster group box holds four rows -- delta and its
-	note, rmax and its note -- where the quantile box above holds two in
-	60, so 90 left the last note below the frame.  115 covers the four
-	rows; the frame is nonetheless taller than the flow position of the
-	last control inside it, so an empty TEXT row separates it from the
-	group that follows, which -_ls- alone would have placed inside it.
-
-	0.11.2: on the Estimator options tab the label column is 300, the three
-	entry fields start at 340 and are 200 wide, so the long labels fit on
-	one line and the fields fill the group box instead of hugging its left.
-
-	0.11.0: a checkbox drives the two-indicator model.  It has to be a
-	checkbox: the dialog language gives onchange() to EDIT, SPINNER, EXP,
-	FILE and COLOR, and onclickon()/onclickoff() to CHECKBOX and RADIO, but
-	VARNAME and VARLIST carry no event at all, so a box being filled cannot
-	by itself grey out the estimator list.  The checkbox writes nothing to
-	the command line -- the number of variables inside the parentheses is
-	what selects the model.  fv and allowcat are back on the controls box,
-	freeiv.ado having gained factor-variable support.
+	The endogenous side is two VARNAME boxes rather than one VARLIST, so
+	"one variable, or two of them" is enforced by the controls.  A checkbox
+	drives the two-indicator model: VARNAME and VARLIST carry no event, so
+	a box being filled cannot by itself grey out the estimator list.  The
+	checkbox writes nothing to the command line -- the number of variables
+	inside the parentheses is what selects the model.
 
 	keyword:  eclass
 */
@@ -71,7 +70,6 @@ RESET res1
 SCRIPT PREINIT
 BEGIN
 	create BOOLEAN st_none
-	create BOOLEAN st_qbe
 	create BOOLEAN st_oster
 	create BOOLEAN st_lsz
 	create BOOLEAN st_all
@@ -135,7 +133,7 @@ BEGIN
 	values(methodv)							///
 	onselchangelist(methacts)					///
 	option("method")						///
-	default("quadratic moment estimator (default)")			///
+	default(qme)							///
 	label("Estimator")
 
 END
@@ -153,9 +151,8 @@ BEGIN
 END
 
 /* show/hide only.  Mixing .hide with .disable on one control leaves it
-   visible -- which is why the estimator list survived version 0.16.0 while
-   the notes beside it vanished -- so visibility and emission are kept
-   apart: this program hides, and PROGRAM command guards what is written. */
+   visible, so visibility and emission are kept apart: this program hides,
+   and PROGRAM command guards what is written. */
 PROGRAM two_ck
 BEGIN
 	if main.ck_two {
@@ -174,35 +171,30 @@ BEGIN
 END
 
 
+/* the order of freeiv 1.0.0: the interval, order 3, order 4, the other
+   maintained models, all */
 LIST methods
 BEGIN
-	quadratic moment estimator (default)
 	identified set only
-	ordinary least squares
-	cubic, equal variances
-	reverse regression, scale free
-	higher moments, symmetric V
-	quantile bias extrapolation
+	ordinary least squares (upper end of the set)
+	quadratic moment estimator (default)
+	higher moments, V1 and V2 symmetric
 	GMM on orders 2, 3 and 4, joint
 	GMM on orders 2, 3 and 4, profiled
 	Lewbel, Schennach and Zhang (2024)
 	Lewbel (2012), heteroskedasticity
 	copula (Park and Gupta 2012)
-	rank control function
-	residual purging IV (inconsistent)
-	adaptive rule OLS / RPIV
+	rank control function (Breitung et al. 2024)
 	Oster (2019), coefficient stability
 	all of the above
 END
 
 /* One entry per entry of -methods-, in the same order:
-     qme bounds ols sce rre hme        -> no option on that tab
-     qbe                               -> quantile()
-     gmm pgmm                          -> no option
+     bounds ols qme hme gmm pgmm       -> no option on that tab
      lsz                               -> sign()
-     lewbel12 copula rank rpiv ape     -> no option
+     lewbel12 copula rank              -> no option
      oster                             -> delta() and rmax()
-     all                               -> all three                        */
+     all                               -> both boxes                       */
 LIST methacts
 BEGIN
 	script m_none
@@ -211,12 +203,7 @@ BEGIN
 	script m_none
 	script m_none
 	script m_none
-	script m_qbe
-	script m_none
-	script m_none
 	script m_lsz
-	script m_none
-	script m_none
 	script m_none
 	script m_none
 	script m_none
@@ -226,21 +213,16 @@ END
 
 LIST methodv
 BEGIN
-	qme
 	bounds
 	ols
-	sce
-	rre
+	qme
 	hme
-	qbe
 	gmm
 	pgmm
 	lsz
 	lewbel12
 	copula
 	rank
-	rpiv
-	ape
 	oster
 	all
 END
@@ -251,25 +233,13 @@ END
 DIALOG opts, tabtitle("Estimator options")
 BEGIN
   /* Shown when no group box applies.  They sit where the first group box
-     sits: never more than one of the three is visible at that spot.       */
+     sits: never more than one of them is visible at that spot.            */
   TEXT     tx_noopt	_lft	_top	_iwd	.,			///
 	label("The selected estimator takes no option on this tab.")
   TEXT     tx_twonote	_lft	_ss	_iwd	.,			///
-	label("Only level() and the header switch apply to it.")
+	label("Only level(), vce(svy) and the header switch apply to it.")
 
-  GROUPBOX gb_q		_lft	_top	_iwd	70,			///
-	label("Quantile bias extrapolation")
-  TEXT     tx_q		_ilft	_ss	300	.,			///
-	label("Sub-sample share, quantile():")
-  EDIT     ed_q		340	@	200	.,			///
-	numonly								///
-	option("quantile")						///
-	default(0.25)							///
-	label("quantile")
-  TEXT     tx_qn	_ilft	_ss	_inwd	.,			///
-	label("strictly between 0 and 1; the default is 0.25")
-
-  GROUPBOX gb_o		_lft	+40	_iwd	115,			///
+  GROUPBOX gb_o		_lft	_top	_iwd	115,			///
 	label("Oster (2019): both of these are ASSUMED, not estimated")
   TEXT     tx_d		_ilft	_ss	300	.,			///
 	label("delta(): selection on unobservables / on observables")
@@ -354,21 +324,18 @@ BEGIN
 END
 
 
-/* ----------------------------------------------------------- Weights -- */
+/* ------------------------------------------------- Weights and survey -- */
 
-DIALOG wgt, tabtitle("Weights")
+DIALOG wgt, tabtitle("Weights/survey")
 BEGIN
-  GROUPBOX gb_wgt	_lft	_top	_iwd	110,			///
+  GROUPBOX gb_wgt	_lft	_top	_iwd	90,			///
 	label("Weight type")
   RADIO    rb_wnone	_ilft	_ss	_inwd	., first		///
 	onclickon(program wgt_ck)					///
 	label("No weights")
-  RADIO    rb_wfw	@	_ss	@	.,			///
-	onclickon(program wgt_ck)					///
-	label("Frequency weights (fweight)")
   RADIO    rb_wpw	@	_ss	@	.,			///
 	onclickon(program wgt_ck)					///
-	label("Sampling weights (pweight)")
+	label("Sampling weights (pweight): standard errors in sandwich form")
   RADIO    rb_waw	@	_ss	@	., last			///
 	onclickon(program wgt_ck)					///
 	label("Analytic weights (aweight)")
@@ -378,56 +345,58 @@ BEGIN
   EDIT     ed_wexp	_vlx	@	_vlwd	.,			///
 	label("Weight expression")
 
+  GROUPBOX gb_svy	_lft	_xls	_iwd	70,			///
+	label("Survey data")
+  CHECKBOX ck_svy	_ilft	_ss	_inwd	.,			///
+	onclickon(program wgt_ck)					///
+	onclickoff(program wgt_ck)					///
+	option("vce(svy)")						///
+	label("vce(svy): the weights, strata, PSUs and fpc declared by svyset")
+  TEXT     tx_svyn	_ilft	_ss	_inwd	.,			///
+	label("standard errors linearized over the design, t on its degrees of freedom")
+
 END
 
 PROGRAM wgt_ck
 BEGIN
-	if wgt.rb_wnone {
+	if wgt.ck_svy {
+		call wgt.rb_wnone.disable
+		call wgt.rb_wpw.disable
+		call wgt.rb_waw.disable
 		call wgt.tx_wexp.disable
 		call wgt.ed_wexp.disable
 	}
-	if !wgt.rb_wnone {
-		call wgt.tx_wexp.enable
-		call wgt.ed_wexp.enable
+	if !wgt.ck_svy {
+		call wgt.rb_wnone.enable
+		call wgt.rb_wpw.enable
+		call wgt.rb_waw.enable
+		if wgt.rb_wnone {
+			call wgt.tx_wexp.disable
+			call wgt.ed_wexp.disable
+		}
+		if !wgt.rb_wnone {
+			call wgt.tx_wexp.enable
+			call wgt.ed_wexp.enable
+		}
 	}
 END
 
-/* ------------------------------------------------ the options tab ------ */
-/* Each of these both shows/hides and enables/disables.  The first is what
-   the user sees; the second is what keeps the option off the command line,
-   which is why -PROGRAM command- writes its optionargs unguarded.         */
 
 /* ---------------------------------------------- the options tab -------- */
-/* A dialog program cannot read a combobox.  So each of the seventeen entries
-   of -methacts- runs a SCRIPT that sets one of five BOOLEANs and then calls
-   -check_method-, which reads them.  Only a SCRIPT can set a BOOLEAN; a
-   PROGRAM cannot.  That indirection is also what lets the two-indicator
-   checkbox restore the right group box when it is unticked: the method's
-   own state is still recorded in the booleans.
-
-   Six states.  Which option belongs to which route is in help freeiv and in
-   notes/DIALOG_AUDIT.md; the dialog says only what a dialog has to say,
-   which is why an empty tab is explained and nothing else is.
+/* Each entry of -methacts- runs a SCRIPT that sets one of four BOOLEANs
+   and then calls -check_method-, which reads them.  Only a SCRIPT can set a
+   BOOLEAN; a PROGRAM cannot.  That indirection is also what lets the
+   two-indicator checkbox restore the right group box when it is unticked:
+   the method's own state is still recorded in the booleans.
 
    Each branch states the whole tab, so no BOOLEAN is ever negated, and
    st_two is tested last and therefore wins.  Visibility only: hiding a
-   control does not keep it off the command line, so PROGRAM command guards
-   what is written, with the same booleans.                                */
+   control does not keep it off the command line, and PROGRAM command
+   decides what is written from the combobox itself.                       */
 
 SCRIPT m_none
 BEGIN
 	st_none.settrue
-	st_qbe.setfalse
-	st_oster.setfalse
-	st_lsz.setfalse
-	st_all.setfalse
-	program check_method
-END
-
-SCRIPT m_qbe
-BEGIN
-	st_none.setfalse
-	st_qbe.settrue
 	st_oster.setfalse
 	st_lsz.setfalse
 	st_all.setfalse
@@ -437,7 +406,6 @@ END
 SCRIPT m_oster
 BEGIN
 	st_none.setfalse
-	st_qbe.setfalse
 	st_oster.settrue
 	st_lsz.setfalse
 	st_all.setfalse
@@ -447,7 +415,6 @@ END
 SCRIPT m_lsz
 BEGIN
 	st_none.setfalse
-	st_qbe.setfalse
 	st_oster.setfalse
 	st_lsz.settrue
 	st_all.setfalse
@@ -457,7 +424,6 @@ END
 SCRIPT m_all
 BEGIN
 	st_none.setfalse
-	st_qbe.setfalse
 	st_oster.setfalse
 	st_lsz.setfalse
 	st_all.settrue
@@ -467,10 +433,6 @@ END
 PROGRAM check_method
 BEGIN
 	if (st_none) {
-		call opts.gb_q.hide
-		call opts.tx_q.hide
-		call opts.ed_q.hide
-		call opts.tx_qn.hide
 		call opts.gb_o.hide
 		call opts.tx_d.hide
 		call opts.ed_d.hide
@@ -485,30 +447,7 @@ BEGIN
 		call opts.tx_noopt.show
 		call opts.tx_twonote.hide
 	}
-	if (st_qbe) {
-		call opts.gb_q.show
-		call opts.tx_q.show
-		call opts.ed_q.show
-		call opts.tx_qn.show
-		call opts.gb_o.hide
-		call opts.tx_d.hide
-		call opts.ed_d.hide
-		call opts.tx_dn.hide
-		call opts.tx_r.hide
-		call opts.ed_r.hide
-		call opts.tx_rn.hide
-		call opts.gb_s.hide
-		call opts.tx_s.hide
-		call opts.rb_s1.hide
-		call opts.rb_s2.hide
-		call opts.tx_noopt.hide
-		call opts.tx_twonote.hide
-	}
 	if (st_oster) {
-		call opts.gb_q.hide
-		call opts.tx_q.hide
-		call opts.ed_q.hide
-		call opts.tx_qn.hide
 		call opts.gb_o.show
 		call opts.tx_d.show
 		call opts.ed_d.show
@@ -524,10 +463,6 @@ BEGIN
 		call opts.tx_twonote.hide
 	}
 	if (st_lsz) {
-		call opts.gb_q.hide
-		call opts.tx_q.hide
-		call opts.ed_q.hide
-		call opts.tx_qn.hide
 		call opts.gb_o.hide
 		call opts.tx_d.hide
 		call opts.ed_d.hide
@@ -543,10 +478,6 @@ BEGIN
 		call opts.tx_twonote.hide
 	}
 	if (st_all) {
-		call opts.gb_q.show
-		call opts.tx_q.show
-		call opts.ed_q.show
-		call opts.tx_qn.show
 		call opts.gb_o.show
 		call opts.tx_d.show
 		call opts.ed_d.show
@@ -562,10 +493,6 @@ BEGIN
 		call opts.tx_twonote.hide
 	}
 	if (st_two) {
-		call opts.gb_q.hide
-		call opts.tx_q.hide
-		call opts.ed_q.hide
-		call opts.tx_qn.hide
 		call opts.gb_o.hide
 		call opts.tx_d.hide
 		call opts.ed_d.hide
@@ -611,44 +538,41 @@ BEGIN
 	if byifin.ed_in {
 		put " in " byifin.ed_in
 	}
-	if !wgt.rb_wnone {
-		require wgt.ed_wexp
-		put " ["
-		if wgt.rb_wfw {
-			put "fweight"
+	/* under vce(svy) the weights are those of svyset: none is written */
+	if !wgt.ck_svy {
+		if !wgt.rb_wnone {
+			require wgt.ed_wexp
+			put " ["
+			if wgt.rb_wpw {
+				put "pweight"
+			}
+			if wgt.rb_waw {
+				put "aweight"
+			}
+			put "=" wgt.ed_wexp "]"
 		}
-		if wgt.rb_wpw {
-			put "pweight"
-		}
-		if wgt.rb_waw {
-			put "aweight"
-		}
-		put " = " wgt.ed_wexp "]"
 	}
 	beginoptions
 		/* Hiding a control does not keep it off the command line, so
 		   the BOOLEANs that decide what is shown decide here too --
 		   the same pattern DASP's ineq.dlg uses to guard an optionarg
 		   with has_index8.  One flat -if- per state, never nested. */
+		/* the two-indicator model refuses them all, so its box wins.
+		   What is written follows the estimator read from the combobox
+		   itself (iseq), not the booleans of the scripts: a dialog filled
+		   in from outside -- freeiv_examples, db -- sets the combobox
+		   without being sure its script runs. */
 		if !main.ck_two {
-			optionarg main.cb_m
+			optionarg /hidedefault main.cb_m
 		}
-		if st_qbe {
-			optionarg /hidedefault opts.ed_q
-		}
-		if st_oster {
+		if (!main.ck_two & (main.cb_m.iseq("oster") | main.cb_m.iseq("all"))) {
 			optionarg /hidedefault opts.ed_d
 			optionarg opts.ed_r
 		}
-		if st_lsz {
+		if (!main.ck_two & (main.cb_m.iseq("lsz") | main.cb_m.iseq("all"))) {
 			option opts.rb_s2
 		}
-		if st_all {
-			optionarg /hidedefault opts.ed_q
-			optionarg /hidedefault opts.ed_d
-			optionarg opts.ed_r
-			option opts.rb_s2
-		}
+		option wgt.ck_svy
 		option rep.ck_nohd
 		optionarg /hidedefault rep.sp_level
 	endoptions

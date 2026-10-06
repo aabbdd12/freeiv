@@ -2,76 +2,72 @@ v 3
 d freeiv: Instrument-free estimation of a linear structural model
 d
 d  freeiv estimates the coefficient on an endogenous regressor without an
-d  external instrument.  Under scale consistency alone -- the confounder's
-d  direct loading in the outcome equation is proportional to its loading in
-d  the first stage -- the coefficient is bounded by [gamma-tilde/2,
-d  gamma-tilde], where gamma-tilde is the OLS slope, and that interval is
-d  exactly the region where the implied variances are non-negative.  Every
-d  point estimator adds one assumption to close the system; the package shows
-d  them side by side against the interval so that each can be judged.
+d  external instrument.  Under scale consistency -- the confounder moves the
+d  outcome directly by exactly as much as it moves it through the regressor --
+d  the second moments leave one number free, the confounder's share of the
+d  first-stage residual variance, and the coefficient lies in
+d  [gamma-tilde/2, gamma-tilde], gamma-tilde being the OLS slope: exactly the
+d  region where the implied variances are non-negative.  The routes impose
+d  the same linear structure order after order: the interval (order 2), the
+d  quadratic moment estimator (default) and the higher-moment estimator
+d  (order 3), the joint GMM on nine moments with its Hansen J and the region
+d  where the profiled J stays within 3.84 of its minimum, and its profiled
+d  companion (order 4).  For comparison on the same data, judged by the same
+d  interval: Lewbel, Schennach and Zhang (2024) as trigmm implements it,
+d  Lewbel (2012), the Gaussian copula, the rank control function and Oster
+d  (2019).
 d
-d  Routes implemented: the identified set; the quadratic moment estimator
-d  (default), which needs only a non-zero third moment of the confounder; the
-d  cubic under equal variances and its scale-free counterpart; the
-d  higher-moment estimator; quantile bias extrapolation; two GMM routes on the
-d  moments of orders two, three and four, each with its over-identification
-d  test -- the joint nine-moment estimator of Araar (2026c), minimised on a
-d  deterministic two-dimensional grid rather than by multi-start, which also
-d  returns the region of gamma where the profiled Hansen statistic is within
-d  3.84 of its minimum, and the profiled variant, which is one-dimensional and
-d  needs no optimiser at all; Lewbel, Schennach and Zhang (2024) as trigmm
-d  implements it; and, for comparison on the same data, Lewbel (2012), the
-d  Gaussian copula, the rank control function, and Oster (2019).
-d
-d  Two endogenous variables sharing one latent confounder switch to the
+d  Two endogenous variables loading on one confounder switch to the
 d  two-indicator model, where the confounder's direct loading is free and
-d  identified -- which is what makes scale consistency itself testable.
+d  identified, so that scale consistency itself is tested.
 d
-d  Companion commands: freeivmenu says which routes the data can carry before
-d  any estimation; freeivdiag says what a value of gamma implies about the
-d  unobservables, whatever produced it; freeivtest reports endogeneity,
-d  agreement between routes, and an outside estimate against the identified
-d  set; freeivreport assembles all of it into one table.
+d  Standard errors by the delta method on the moment contributions; pweights
+d  in sandwich form; vce(svy) linearizes over the design declared by svyset.
+d  Companion commands: freeivmenu (what the data can carry, before any
+d  estimation), freeivdiag (what a value of gamma implies), freeivtest
+d  (endogeneity, agreement between routes, an outside estimate against the
+d  interval), freeivreport (all of it in one table); a dialog box; the
+d  examples of the help run from their links (freeiv_examples).
 d
-d  Four datasets travel with the package and are retrieved with -net get
-d  freeiv-.  Three are simulated and their generating equations are printed in
-d  help freeiv, so none is a black box: freeiv_sim1 satisfies the model and the
-d  true coefficient is known, freeiv_sim2 differs from it only in that the
-d  first-stage disturbance is skewed, which invalidates the symmetry route and
-d  leaves the others intact, and freeiv_proxy carries two endogenous regressors
-d  loading on one confounder.  The fourth, freeiv_card, is the Card (1995)
-d  extract used in the empirical section of Araar (2026d), distributed with
-d  Wooldridge's teaching datasets; on it a single endogenous regressor can only
-d  be bounded, while a second indicator of the same confounder identifies it,
-d  which is the argument of that paper on its own data.
+d  Four datasets travel with the package (net get freeiv, or ssc install
+d  freeiv, all): freeiv_sim1 and freeiv_sim2, simulated with a known truth,
+d  freeiv_proxy, simulated with two indicators, and freeiv_card, the Card
+d  (1995) extract distributed with Wooldridge's teaching datasets.
+d  freeiv_paper.pdf presents the models, the command and worked examples at
+d  article length (doi:10.5281/zenodo.22770175).
 d
-d  freeiv_paper.pdf, also retrieved by net get, presents the models, the
-d  command and worked examples at article length; it is archived at
-d  doi:10.5281/zenodo.22770175 and is the reference to cite for the package.
+d KW: endogeneity
+d KW: instrument-free estimation
+d KW: latent confounder
+d KW: higher-order moments
+d KW: partial identification
+d KW: survey data
 d
 d Requires: Stata version 16
 d
-d Distribution-Date: 20260915
+d Version: 1.0.0
+d Distribution-Date: 20261006
 d
 d Author: Abdelkrim Araar, Universite Laval and PEP
 d Support: email aabd@ecn.ulaval.ca
 d
-f freeiv.ado
-f freeiv_engine.ado
-f freeiv_mata.ado
-f freeivmenu.ado
-f freeivdiag.ado
-f freeivtest.ado
-f freeivreport.ado
-f freeiv.sthlp
-f freeivmenu.sthlp
-f freeivdiag.sthlp
-f freeivtest.sthlp
-f freeivreport.sthlp
-f freeiv.dlg
-f freeiv_card.dta
-f freeiv_sim1.dta
-f freeiv_sim2.dta
-f freeiv_proxy.dta
-f freeiv_paper.pdf
+f src/freeiv.ado
+f src/freeiv_engine.ado
+f src/freeiv_mata.ado
+f src/freeivmenu.ado
+f src/freeivdiag.ado
+f src/freeivtest.ado
+f src/freeivreport.ado
+f src/freeiv_examples.ado
+f src/freeiv.sthlp
+f src/freeivmenu.sthlp
+f src/freeivdiag.sthlp
+f src/freeivtest.sthlp
+f src/freeivreport.sthlp
+f src/freeiv.dlg
+f examples/freeiv_card.dta
+f examples/freeiv_sim1.dta
+f examples/freeiv_sim2.dta
+f examples/freeiv_proxy.dta
+f paper/freeiv_paper.pdf
 e

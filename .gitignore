@@ -1,0 +1,4 @@
+# logs of local runs (the log of the run that produced the paper is kept)
+*.log
+!replication/logs/*.log
+*.smcl

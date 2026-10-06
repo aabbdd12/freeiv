@@ -1,0 +1,1063 @@
+--------------------------------------------------------------------------------
+      name:  fivnote
+       log:  C:\Users\aabd\OneDrive\Desktop\freeiv_project\freeiv_note.log
+  log type:  text
+ opened on:   6 Oct 2026, 09:12:25
+
+. di as txt "Stata " c(stata_version) ", " c(current_date)
+Stata 19.5,  6 Oct 2026
+
+. * the datasets are read as a reader reads them after -net get freeiv-
+. cd examples
+C:\Users\aabd\OneDrive\Desktop\freeiv_project\examples
+
+. 
+. * ======================================================================
+. * Section 3.6 -- the bootstrap: the qme near the edge (z of D 1.49)
+. * ======================================================================
+. use freeiv_sim1, clear
+(freeiv sim1: U chi2(3), V normal, gamma=0.4, alpha2=0.8)
+
+. set seed 20261006
+
+. bootstrap, reps(500) nodots: freeiv y1 x (y2)
+------------------------------------------------------------------------------
+             |   Observed   Bootstrap                         Normal-based
+          y1 | coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+          y2 |   .4355823   .0527482     8.26   0.000     .3321978    .5389668
+------------------------------------------------------------------------------
+bootstrap: 500 of 500 replications have an estimate (100%)
+------------------------------------------------------------------------
+Identification
+    OLS slope, gamma-tilde = gamma (1 + c)   0.564577
+    bounds, c in [0, 1]                      [0.282288, 0.564577]
+    skewness of the first-stage residual     0.387909
+    discriminant D = 9m12^2 - 8m03m21        0.496263  (s.e. 0.332805)
+        D = gamma^2 (2A - B)^2 : z against 0 1.491153
+    roots of the quadratic                   0.435582 and 0.854281
+        of which inside the bounds                    1
+    R* = m12^2/(m03 m21)                     0.993582
+        its floor is 8/9 when m03 m21 > 0
+------------------------------------------------------------------------
+Nuisances implied by the retained value
+    theta = alpha2^2 Var(U)                  0.496171
+    sigma2_V2                                1.179275
+    sigma2_V1                                1.005229
+    c = theta/(theta + sigma2_V2)            0.296142  the share the
+        bounds leave free: gamma = gamma-tilde/(1 + c)
+    E[(alpha2 U)^3], the confounder's        0.819511
+    E[V2^3]                                  0.021739  (hme takes it 0)
+------------------------------------------------------------------------
+Over-identification at order four: nine moments, eight parameters
+    profiled GMM, method(pgmm): orders 2 and 3 fitted exactly
+        gamma                                0.445316
+        J, 1 df                                  0.1426   P>chi2 0.7057
+        the joint GMM, and the region where its J stays within
+        3.84 of its minimum: method(gmm) or method(all)
+    B kurt_U - A kurt_V2                         0.2268   z   1.15
+    The J tests alpha1 = gamma alpha2.  The Jacobian of the
+    model with alpha1 FREE has determinant -(gamma - tau)^5
+    times the factor above, so the restriction is testable
+    everywhere except where that factor vanishes -- and a
+    normal V2 sits exactly there, since it makes both B and
+    kurt_V2 zero.
+    The J does not reject AND the factor is not distinguishable
+    from zero, so this non-rejection carries no information
+    about scale consistency: the design is near the surface
+    where the restriction cannot be tested at all.
+    The factor's magnitude is NOT a calibrated measure of power;
+    only its vanishing, under the null, is meaningful.
+------------------------------------------------------------------------
+s.e.: delta method on the stacked moments; the estimation of the
+coefficients on X is accounted for.  The QME's own standard error is
+proportional to 1/sqrt(D): it explodes as the discriminant nears zero.
+
+. 
+. * ======================================================================
+. * Section 4.1 -- where the model holds (truth 0.40)
+. * ======================================================================
+. use freeiv_sim1, clear
+(freeiv sim1: U chi2(3), V normal, gamma=0.4, alpha2=0.8)
+
+. freeivmenu y1 x (y2)
+
+Identification menu: what these data can carry
+y1 on y2, controls x                                   n =     5000
+----------------------------------------------------------------------------
+route                 signal                           value  verdict
+----------------------------------------------------------------------------
+bounds                width of the interval           0.2823  always
+                      [gamma-tilde/2, gamma-tilde]  [0.2823, 0.5646]
+third order: qme,     skewness of eps2                0.3879
+  hme, lsz            z of m03                          5.68  strong
+                      z of the discriminant D           1.49  weak
+                      implied s.e. of the QME         0.0436  usable
+                      A = alpha2^3 E[U^3]             0.8195
+                      mu = A/(A+B)                    0.9742
+symmetry of V2: hme   B = E[V2^3], hme sets 0         0.0217  plausible
+heteroskedasticity:   F of eps2^2 on X                  0.78  absent
+  lewbel12            p                               0.3773
+local slope profile   slope of xi on eps2 at p5       0.4703  h = 0.500
+  of E[xi | eps2]     p10 / p25 / p50              0.4694  0.4882  0.5481
+                      p75 / p90 / p95              0.5658  0.6177  0.6926
+                      curvature z (max-min)             2.80  curved
+                      min slope, at p10               0.4694  tightens
+                      tail ratio p95/p5                 1.47  not 2
+two indicators        freeivmenu y1 x (y2 y3)              .  by syntax
+----------------------------------------------------------------------------
+Reading: the first line is always true; the others say whether the
+assumption that identifies is carried by the data.  A weak signal does
+not make an estimator wrong, it makes it imprecise.  B = 0 is a
+restriction on the model, which the hme adds to the qme's.
+The slope profile is flat when the confounder is Gaussian-like; its
+minimum bounds gamma from above when E[U|eps2] is increasing, and the
+tail ratio tends to 2 under scale consistency.  A curved profile is
+a skewed confounder or a non-linear outcome equation: it does not say
+which.
+
+. freeiv y1 x (y2), method(all)
+
+Instrument-free estimation                 Number of obs    =     5,000
+model: y1 on y2, controls x
+method: all
+------------------------------------------------------------------------
+Estimates of gamma         estimate   std. err.
+  the interval
+    bounds               [0.282288, 0.564577]
+    ols = gamma-tilde    0.564577    0.011820  
+  order 3
+    qme                  0.435582    0.043598  
+    hme                  0.448740    0.021985  
+  order 4
+    gmm                  0.445484    0.038063  J 0.143  p 0.705
+    pgmm                 0.445316    0.037618  J 0.143  p 0.706
+  other maintained models
+    lsz                  0.563742            .  did not converge
+    lewbel12             1.384843            .  outside the bounds
+    copula               1.353432            .  outside the bounds
+    rank                 1.350008            .  outside the bounds
+    oster                0.451458            .  
+    an estimate outside the bounds implies a negative variance
+    under scale consistency; -freeivdiag, gamma(#)- says which
+------------------------------------------------------------------------
+Identification
+    OLS slope, gamma-tilde = gamma (1 + c)   0.564577
+    bounds, c in [0, 1]                      [0.282288, 0.564577]
+    skewness of the first-stage residual     0.387909
+    discriminant D = 9m12^2 - 8m03m21        0.496263  (s.e. 0.332805)
+        D = gamma^2 (2A - B)^2 : z against 0 1.491153
+    roots of the quadratic                   0.435582 and 0.854281
+        of which inside the bounds                    1
+    R* = m12^2/(m03 m21)                     0.993582
+        its floor is 8/9 when m03 m21 > 0
+------------------------------------------------------------------------
+Nuisances implied by the retained value
+    theta = alpha2^2 Var(U)                  0.496171
+    sigma2_V2                                1.179275
+    sigma2_V1                                1.005229
+    c = theta/(theta + sigma2_V2)            0.296142  the share the
+        bounds leave free: gamma = gamma-tilde/(1 + c)
+    E[(alpha2 U)^3], the confounder's        0.819511
+    E[V2^3]                                  0.021739  (hme takes it 0)
+------------------------------------------------------------------------
+Over-identification at order four: nine moments, eight parameters
+    joint GMM, method(gmm)
+        gamma                                0.445484
+        J, 1 df                                  0.1432   P>chi2 0.7051
+        J within 3.84 of its minimum on [0.372856, 0.555166]
+        that is  64.6% of [gamma-tilde/2, gamma-tilde]
+    profiled GMM, method(pgmm): orders 2 and 3 fitted exactly
+        gamma                                0.445316
+        J, 1 df                                  0.1426   P>chi2 0.7057
+        a different estimator, not the same one solved
+        differently: a wide gap from the joint GMM signals a
+        flat criterion
+    B kurt_U - A kurt_V2                         0.2268   z   1.15
+    The J tests alpha1 = gamma alpha2.  The Jacobian of the
+    model with alpha1 FREE has determinant -(gamma - tau)^5
+    times the factor above, so the restriction is testable
+    everywhere except where that factor vanishes -- and a
+    normal V2 sits exactly there, since it makes both B and
+    kurt_V2 zero.
+    The J does not reject AND the factor is not distinguishable
+    from zero, so this non-rejection carries no information
+    about scale consistency: the design is near the surface
+    where the restriction cannot be tested at all.
+    The factor's magnitude is NOT a calibrated measure of power;
+    only its vanishing, under the null, is meaningful.
+------------------------------------------------------------------------
+s.e.: delta method on the stacked moments; the estimation of the
+coefficients on X is accounted for.  The QME's own standard error is
+proportional to 1/sqrt(D): it explodes as the discriminant nears zero.
+
+. 
+. * ======================================================================
+. * Section 4.2 -- the edge of identification (truth 0.40, B close to 2A)
+. * ======================================================================
+. use freeiv_sim2, clear
+(freeiv sim2: U and V2 chi2(3), gamma=0.4, alpha2=0.8)
+
+. freeiv y1 x (y2), method(all)
+
+Instrument-free estimation                 Number of obs    =     5,000
+model: y1 on y2, controls x
+method: all
+------------------------------------------------------------------------
+Estimates of gamma         estimate   std. err.
+  the interval
+    bounds               [0.283529, 0.567059]
+    ols = gamma-tilde    0.567059    0.011858  
+  order 3
+    qme                  0.419948    0.017144  vertex
+    hme                  0.335688    0.015063  
+  order 4
+    gmm                  0.409801    0.218756  J 2.016  p 0.156
+    pgmm                 0.402335    0.133679  J 1.987  p 0.159
+  other maintained models
+    lsz                  -0.261681   1.822672  outside the bounds
+    lewbel12             1.318037            .  outside the bounds
+    copula               0.574847            .  outside the bounds
+    rank                 0.545216            .  
+    oster                0.450926            .  
+    qme: negative discriminant, no real root -- the vertex
+    3 m12/(4 m03), where the two roots merge
+    an estimate outside the bounds implies a negative variance
+    under scale consistency; -freeivdiag, gamma(#)- says which
+------------------------------------------------------------------------
+Identification
+    OLS slope, gamma-tilde = gamma (1 + c)   0.567059
+    bounds, c in [0, 1]                      [0.283529, 0.567059]
+    skewness of the first-stage residual     1.050610
+    discriminant D = 9m12^2 - 8m03m21        -0.538322  (s.e. 0.631877)
+        D = gamma^2 (2A - B)^2 : z against 0 -0.851940
+    no real root; vertex                     0.419948
+    R* = m12^2/(m03 m21)                     0.856380
+        its floor is 8/9 when m03 m21 > 0
+------------------------------------------------------------------------
+Nuisances implied by the retained value
+    theta = alpha2^2 Var(U)                  0.580610
+    sigma2_V2                                1.076828
+    sigma2_V1                                1.004369
+    c = theta/(theta + sigma2_V2)            0.350306  the share the
+        bounds leave free: gamma = gamma-tilde/(1 + c)
+    E[(alpha2 U)^3], the confounder's        0.747268
+    E[V2^3]                                  1.494536  (hme takes it 0)
+------------------------------------------------------------------------
+Over-identification at order four: nine moments, eight parameters
+    joint GMM, method(gmm)
+        gamma                                0.409801
+        J, 1 df                                  2.0162   P>chi2 0.1556
+        J within 3.84 of its minimum on [0.323697, 0.518622]
+        that is  68.8% of [gamma-tilde/2, gamma-tilde]
+    profiled GMM, method(pgmm): orders 2 and 3 fitted exactly
+        gamma                                0.402335
+        J, 1 df                                  1.9866   P>chi2 0.1587
+        a different estimator, not the same one solved
+        differently: a wide gap from the joint GMM signals a
+        flat criterion
+    B kurt_U - A kurt_V2                         0.7339   z   0.93
+    The J tests alpha1 = gamma alpha2.  The Jacobian of the
+    model with alpha1 FREE has determinant -(gamma - tau)^5
+    times the factor above, so the restriction is testable
+    everywhere except where that factor vanishes -- and a
+    normal V2 sits exactly there, since it makes both B and
+    kurt_V2 zero.
+    The J does not reject AND the factor is not distinguishable
+    from zero, so this non-rejection carries no information
+    about scale consistency: the design is near the surface
+    where the restriction cannot be tested at all.
+    The factor's magnitude is NOT a calibrated measure of power;
+    only its vanishing, under the null, is meaningful.
+------------------------------------------------------------------------
+s.e.: delta method on the stacked moments; the estimation of the
+coefficients on X is accounted for.  The QME's own standard error is
+proportional to 1/sqrt(D): it explodes as the discriminant nears zero.
+
+. 
+. * ======================================================================
+. * Section 4.3 -- Card, one endogenous regressor: the interval is the result
+. * ======================================================================
+. use freeiv_card, clear
+
+. freeivmenu lwage exper expersq black south smsa (educ)
+
+Identification menu: what these data can carry
+lwage on educ, controls exper expersq black south smsa
+                                                       n =     3010
+----------------------------------------------------------------------------
+route                 signal                           value  verdict
+----------------------------------------------------------------------------
+bounds                width of the interval           0.0370  always
+                      [gamma-tilde/2, gamma-tilde]  [0.0370, 0.0740]
+third order: qme,     skewness of eps2                0.1715
+  hme, lsz            z of m03                          2.43  weak
+                      z of the discriminant D           0.01  absent
+                      implied s.e. of the QME         0.2537  wide
+                      A = alpha2^3 E[U^3]             0.5850
+                      mu = A/(A+B)                    0.4629
+symmetry of V2: hme   B = E[V2^3], hme sets 0         0.6788  doubtful
+heteroskedasticity:   F of eps2^2 on X                 19.52  present
+  lewbel12            p                               0.0000
+local slope profile   slope of xi on eps2 at p5       0.0847  h = 0.831
+  of E[xi | eps2]     p10 / p25 / p50              0.0727  0.0603  0.0681
+                      p75 / p90 / p95              0.0863  0.0859  0.0570
+                      curvature z (max-min)             1.43  flat
+                      min slope, at p95               0.0570  interior min
+                      tail ratio p95/p5                 0.67  not 2
+two indicators        freeivmenu y1 x (y2 y3)              .  by syntax
+----------------------------------------------------------------------------
+Reading: the first line is always true; the others say whether the
+assumption that identifies is carried by the data.  A weak signal does
+not make an estimator wrong, it makes it imprecise.  B = 0 is a
+restriction on the model, which the hme adds to the qme's.
+The slope profile is flat when the confounder is Gaussian-like; its
+minimum bounds gamma from above when E[U|eps2] is increasing, and the
+tail ratio tends to 2 under scale consistency.  A curved profile is
+a skewed confounder or a non-linear outcome equation: it does not say
+which.
+
+. freeiv lwage exper expersq black south smsa (educ), method(all)
+
+Instrument-free estimation                 Number of obs    =     3,010
+model: lwage on educ, controls exper expersq black south smsa
+method: all
+------------------------------------------------------------------------
+Estimates of gamma         estimate   std. err.
+  the interval
+    bounds               [0.037004, 0.074009]
+    ols = gamma-tilde    0.074009    0.003638  
+  order 3
+    qme                  0.072146    0.253687  
+    hme                          .           .  
+  order 4
+    gmm                  0.074008            .  J 2.675  p 0.102
+    pgmm                 0.073909    0.060269  J 2.681  p 0.102
+  other maintained models
+    lsz                  0.074091            .  did not converge
+    lewbel12             0.075721            .  outside the bounds
+    copula               0.008638            .  outside the bounds
+    rank                 0.057380            .  
+    oster                0.083968            .  outside the bounds
+    gmm: minimum on the boundary, so no standard error;
+    read the region of the J below
+    an estimate outside the bounds implies a negative variance
+    under scale consistency; -freeivdiag, gamma(#)- says which
+------------------------------------------------------------------------
+Identification
+    OLS slope, gamma-tilde = gamma (1 + c)   0.074009
+    bounds, c in [0, 1]                      [0.037004, 0.074009]
+    skewness of the first-stage residual     0.171498
+    discriminant D = 9m12^2 - 8m03m21        0.001256  (s.e. 0.112563)
+        D = gamma^2 (2A - B)^2 : z against 0 0.011162
+    roots of the quadratic                   0.072146 and 0.086169
+        of which inside the bounds                    1
+    R* = m12^2/(m03 m21)                     0.895919
+        its floor is 8/9 when m03 m21 > 0
+------------------------------------------------------------------------
+Nuisances implied by the retained value
+    theta = alpha2^2 Var(U)                  0.097813
+    sigma2_V2                                3.689052
+    sigma2_V1                                0.139243
+    c = theta/(theta + sigma2_V2)            0.025830  the share the
+        bounds leave free: gamma = gamma-tilde/(1 + c)
+    E[(alpha2 U)^3], the confounder's        0.585044
+    E[V2^3]                                  0.678761  (hme takes it 0)
+------------------------------------------------------------------------
+Over-identification at order four: nine moments, eight parameters
+    joint GMM, method(gmm)
+        gamma                                0.074008
+        J, 1 df                                  2.6746   P>chi2 0.1020
+        J within 3.84 of its minimum on [0.037005, 0.074008]
+        that is 100.0% of [gamma-tilde/2, gamma-tilde]
+    note: that region is the WHOLE identified interval, so the
+          moments of orders 3 and 4 add nothing here to the
+          assumption-free bounds.  The point estimate is the
+          argmin of a flat criterion; report the interval.
+    note: the minimum is ON THE BOUNDARY -- gamma at an end of
+          the interval, or theta at its floor.  Neither the
+          standard error nor the chi2(1) law for J is valid
+          there, so no standard error is printed.
+    note: theta < 0.05 at the minimum: the implied confounder
+          has almost no variance, so kurt_U is not defined and
+          there is nothing for the higher moments to bind on.
+    profiled GMM, method(pgmm): orders 2 and 3 fitted exactly
+        gamma                                0.073909
+        J, 1 df                                  2.6808   P>chi2 0.1016
+        a different estimator, not the same one solved
+        differently: a wide gap from the joint GMM signals a
+        flat criterion
+    B kurt_U - A kurt_V2                         2.5440   z   0.66
+    The J tests alpha1 = gamma alpha2.  The Jacobian of the
+    model with alpha1 FREE has determinant -(gamma - tau)^5
+    times the factor above, so the restriction is testable
+    everywhere except where that factor vanishes -- and a
+    normal V2 sits exactly there, since it makes both B and
+    kurt_V2 zero.
+    The factor's magnitude is NOT a calibrated measure of power;
+    only its vanishing, under the null, is meaningful.
+------------------------------------------------------------------------
+s.e.: delta method on the stacked moments; the estimation of the
+coefficients on X is accounted for.  The QME's own standard error is
+proportional to 1/sqrt(D): it explodes as the discriminant nears zero.
+
+. * the same model with fewer controls, and what its qme implies
+. freeiv lwage exper expersq (educ)
+
+Instrument-free estimation                 Number of obs    =     3,010
+model: lwage on educ, controls exper expersq
+method: qme
+------------------------------------------------------------------------
+    gamma (educ)       0.119280  s.e. 0.039585   [ 0.041695,  0.196865]
+        z =   3.013    P>|z| = 0.0026
+note: the estimate lies OUTSIDE the identification bounds:
+      under scale consistency it implies a negative variance
+      (see the nuisances below, or -freeivdiag-)
+------------------------------------------------------------------------
+Identification
+    OLS slope, gamma-tilde = gamma (1 + c)   0.093171
+    bounds, c in [0, 1]                      [0.046585, 0.093171]
+    skewness of the first-stage residual     0.183875
+    discriminant D = 9m12^2 - 8m03m21        0.100033  (s.e. 0.128825)
+        D = gamma^2 (2A - B)^2 : z against 0 0.776500
+    roots of the quadratic                   0.016088 and 0.119280
+        of which inside the bounds                    0
+note: NEITHER root lies in [gamma-tilde/2, gamma-tilde].
+      That interval is exactly the region where the implied
+      variances are non-negative, so the retained value is
+      not compatible with the model under scale consistency.
+      Read the J below, and freeivmenu, before using it.
+    R* = m12^2/(m03 m21)                     2.121994
+        its floor is 8/9 when m03 m21 > 0
+------------------------------------------------------------------------
+Nuisances implied by the retained value
+    theta = alpha2^2 Var(U)                  -0.899798
+    sigma2_V2                                5.010482
+    sigma2_V1                                0.173993
+    c = theta/(theta + sigma2_V2)            -0.218893  the share the
+        bounds leave free: gamma = gamma-tilde/(1 + c)
+    E[(alpha2 U)^3], the confounder's        -0.373028
+    E[V2^3]                                  1.905508  (hme takes it 0)
+note: an implied variance is NEGATIVE, which no model can
+      produce.  The retained value lies outside the region
+      where scale consistency is feasible; the numbers just
+      above are arithmetic, not estimates.
+------------------------------------------------------------------------
+Over-identification at order four: nine moments, eight parameters
+    profiled GMM, method(pgmm): orders 2 and 3 fitted exactly
+        gamma                                0.093071
+        J, 1 df                                  1.9396   P>chi2 0.1637
+        the joint GMM, and the region where its J stays within
+        3.84 of its minimum: method(gmm) or method(all)
+    B kurt_U - A kurt_V2                         1.6040   z   0.63
+    The J tests alpha1 = gamma alpha2.  The Jacobian of the
+    model with alpha1 FREE has determinant -(gamma - tau)^5
+    times the factor above, so the restriction is testable
+    everywhere except where that factor vanishes -- and a
+    normal V2 sits exactly there, since it makes both B and
+    kurt_V2 zero.
+    The J does not reject AND the factor is not distinguishable
+    from zero, so this non-rejection carries no information
+    about scale consistency: the design is near the surface
+    where the restriction cannot be tested at all.
+    The factor's magnitude is NOT a calibrated measure of power;
+    only its vanishing, under the null, is meaningful.
+------------------------------------------------------------------------
+s.e.: delta method on the stacked moments; the estimation of the
+coefficients on X is accounted for.  The QME's own standard error is
+proportional to 1/sqrt(D): it explodes as the discriminant nears zero.
+
+. freeivdiag
+
+freeiv diagnostic                      gamma =  0.119280  (qme)
+------------------------------------------------------------------------
+Position inside the identification interval
+    bounds [0.046585, 0.093171]
+    OUTSIDE the bounds: under scale consistency this value
+    implies a negative variance (see below)
+------------------------------------------------------------------------
+Implied nuisances (second-order system, functions of gamma alone)
+    theta = alpha2^2 Var(U)                     -0.899798   NEGATIVE
+    sigma2_V2                                    5.010482
+    sigma2_V1                                    0.173993
+    c = theta/(theta + sigma2_V2)                 -0.2189   outside [0, 1]
+        the confounder's share of Var(eps2); gamma-tilde = gamma (1 + c)
+------------------------------------------------------------------------
+Third moment
+    A = alpha2^3 E[U^3]                         -0.373028
+    B = E[V2^3]  (the hme sets it to 0)          1.905508
+    mu = A/(A+B)                                -0.243415
+------------------------------------------------------------------------
+warning: at least one implied variance is negative -- a model with
+a single linear confounder cannot produce this value of gamma on
+these data
+warning: B departs from 0, so the symmetry assumption of V2 on which
+the HME rests is doubtful
+
+. 
+. * ======================================================================
+. * Section 4.4 -- an estimate from elsewhere: Card's IV against the interval
+. * ======================================================================
+. quietly freeiv lwage exper expersq black south smsa (educ)
+
+. freeivtest, gamma(0.132) segamma(0.049)
+
+freeiv agreement tests                             Number of obs =      3010
+----------------------------------------------------------------------------
+Endogeneity itself: theta = 0, with no estimate of gamma
+    E[r eps2^2] = m12 - gt m03                   0.039853
+    E[r^2 eps2] = m21 - 2gt m12 + gt^2 m03       0.002892
+    Wald, chi2(2)                                  1.4271   P>chi2 0.4899
+    r is the OLS residual of xi on eps2.  Under theta = 0 it is
+    independent of eps2, not merely uncorrelated, so both cross
+    moments vanish.  This never estimates gamma, so it keeps its
+    power where the qme loses its own (small D).
+    Read it with z(m03) from -freeivmenu-: detecting theta > 0 needs
+    m03 != 0 from either U or V2, while ESTIMATING gamma needs
+    A = alpha2^3 E[U^3] != 0, a skewed confounder.  The two signals
+    are different, so detection can succeed where estimation fails.
+----------------------------------------------------------------------------
+Pairwise agreement between the closed forms (reference: qme)
+  pair            difference        s.e.         z    P>|z|   tests
+----------------------------------------------------------------------------
+  qme - ols        -0.001863    0.254307     -0.01   0.9942   theta = 0
+  qme - hme                .           .         .        .   B = 0
+----------------------------------------------------------------------------
+theta = 0: no confounding.  B = 0: V2 symmetric, as the hme assumes.
+A large |z| says the two routes disagree by more than sampling
+noise, so the assumption that separates them is rejected.  A small
+|z| is mutual corroboration: two routes with different assumptions
+agree.  None of these tests scale consistency -- they presuppose it.
+----------------------------------------------------------------------------
+Outside estimate   0.132000 against the identified set
+    bounds [0.037004, 0.074009]   s.e. 0.001819 and 0.003638
+    distance to the upper bound                  0.057991
+    z                                              1.1802   P>|z| 0.2379
+    => outside the set: under scale consistency no value of
+    gamma can produce this estimate without a negative
+    variance.  Run -freeivdiag, gamma(.132)- to see which.
+    (the two standard errors are added as if independent,
+    which they are not -- they come from the same sample)
+----------------------------------------------------------------------------
+
+. 
+. * ======================================================================
+. * Section 4.5 -- a second indicator of the confounder
+. * ======================================================================
+. freeivmenu lwage exper expersq black south smsa (educ motheduc)
+
+Identification menu: two indicators of one confounder
+lwage on educ and motheduc, controls exper expersq black south smsa
+                                                       n =     2657
+----------------------------------------------------------------------------
+route                 signal                           value  verdict
+----------------------------------------------------------------------------
+relevance of the pair corr(eps2, eps3), t              14.61  strong
+                      alpha2 alpha3 = E[eps2 eps3]    1.5245  z 12.59
+                      rule of Araar (2026d): t >= 10
+third order           E[eps2^2 eps3], z                 1.15  absent
+                      E[eps2 eps3^2], z                 1.71  absent
+                      same sign: guard (i)               yes  passes
+loadings              alpha2/alpha3 = R1              0.4085  coherent
+                      alpha2, alpha3                  0.7891  1.9318
+                      implied Var(V2), Var(V3)        3.2247  4.3822  positive
+confounder            implied skewness E[U^3]         0.4666  low
+                        g2 recovered, a1 imprecise
+one factor            R1 / R2 / R3                    0.4085 -1.6550  0.5924
+                      |R3/R1 - 1|                     0.4501  not informative
+local slope profile   slope of xi on eps2 at p5       0.0949  h = 0.859
+  of E[xi | eps2]     p10 / p25 / p50              0.0800  0.0613  0.0670
+                      p75 / p90 / p95              0.0904  0.0884  0.0583
+                      curvature z (max-min)             1.37  flat
+                      min slope, at p95               0.0583  interior min
+                      slope of xi on eps3 at p5       0.0140  h = 1.248
+  of E[xi | eps3]     p10 / p25 / p50              0.0309  0.0094  0.0241
+                      p75 / p90 / p95              0.0309  0.0125  0.0181
+                      curvature z (max-min)             1.79  flat
+                      min slope, at p25               0.0094  interior min
+----------------------------------------------------------------------------
+Reading: the pair must be relevant (t >= 10) and the two third-order
+cross-moments must share a sign, or Theorem 1 has nothing to work
+with; a guard that fires here will fire in freeiv.  The implied
+skewness sets the precision: near 0.5 the causal coefficient is
+recovered but the free direct effect a1 is not; above 1.5 all
+parameters are precise and scale consistency becomes testable.
+The one-factor check reads only when the third order is strong;
+a profile whose minimum is interior does not bound anything.
+
+. freeiv lwage exper expersq black south smsa (educ motheduc)
+
+Instrument-free estimation, two indicators Number of obs    =     2,657
+model: lwage on educ motheduc, controls exper expersq black south smsa
+method: proxy  (Theorem 1, one latent confounder behind both)
+------------------------------------------------------------------------
+Structural coefficients
+    g2 (educ)                    0.065666  s.e. 0.016321   [ 0.03368,  0.09765]
+    g3 (motheduc)               -0.009110  s.e. 0.031368   [-0.07059,  0.05237]
+    a1 (U in the outcome)        0.066575  s.e. 0.137635   [-0.20318,  0.33633]
+        a1 is free here: the two-indicator route needs no
+        scale-consistency restriction to identify it
+------------------------------------------------------------------------
+The confounder, recovered from the two indicators
+    loadings a2, a3                    0.789142   1.931835
+    E[U^3] (mu3)                       0.466618
+    sigma2_V2, sigma2_V3               3.224691   4.382168
+    g2 a2 + g3 a3                      0.034221   (what model A would call a1)
+    condition number of the 3x3 system    27.0868
+------------------------------------------------------------------------
+One-factor check: three estimates of a2/a3 that must agree
+    R1  from eps2, eps3 alone          0.408494
+    R2  from xi eps^2                  -1.655013
+    R3  from xi^2 eps                  0.592369
+    |R3/R1 - 1|                            0.4501   not informative
+    z of eps2^2 eps3, eps2 eps3^2            1.15      1.71   both must reach 2
+    With one factor all three equal a2/a3.  With two, R1 becomes
+    (a2^2 a3 E[U^3] + b2^2 b3 E[W^3]) / (a2 a3^2 E[U^3] +
+    b2 b3^2 E[W^3]), which is a2/a3 only if the second factor is
+    symmetric or loads proportionally, and R3 weights the two
+    factors differently again.  A gap is therefore a second
+    factor, by derivation, not a sampling artefact.
+    R1 - R3                             -0.183875  s.e. 0.485981  z  -0.378
+    R1 equals a2/a3 under one factor with no side condition;
+    R3 needs symmetric V2 and V3 as well, so a rejection here is
+    against one factor AND that symmetry, jointly.
+------------------------------------------------------------------------
+Over-identified GMM, 16 moments for 12 parameters
+    J, 4 df                                2.5166   P>chi2 0.6417
+    g2, g3, a1 from the GMM              0.074901    0.011580   -0.021590
+    E[U^3], E[V2^3], E[V3^3]             0.329821    1.245738  -17.292839
+    The closed form uses eight of these sixteen moments and
+    fits them exactly; the J asks whether the eight it leaves
+    out agree, so it tests the one-factor linear structure
+    itself.  k2 and k3 are E[V2^3] and E[V3^3], the symmetry
+    that R3 -- and only R3 -- needs.
+------------------------------------------------------------------------
+Scale consistency, which model A cannot test
+    a1 (free, identified here)           0.066575
+    g2 a2 + g3 a3                        0.034221
+    difference                           0.032354  s.e. 0.214934  z   0.151
+    Model A imposes alpha1 = gamma1 alpha2, which with two
+    endogenous regressors reads a1 = g2 a2 + g3 a3.  Its own nine
+    moments pin the ratio of the two loadings only up to that
+    normalisation; the second indicator frees a1 and makes the
+    restriction testable.  No fourth moment is needed.
+------------------------------------------------------------------------
+What motheduc used as an instrument for educ would return
+    iv estimate                          0.101543
+    An indicator of the confounder is not an instrument: it is
+    correlated with the very thing it is meant to purge.  The gap
+    against g2 above is the bias that route would carry.
+    correlation of the two indicators, t   14.6133
+------------------------------------------------------------------------
+s.e.: delta method, numeric Jacobian of Theorem 1 on the eight
+moments, with the estimation of the coefficients on X accounted for.
+Theorem 1 involves square roots, so the linearisation is only good
+locally: in the reference design it tracked a 600-replication
+bootstrap to within about ten percent, in either direction.  Prefer
+the -bootstrap- prefix when the inference matters.
+
+. freeivtest
+
+freeiv tests, two indicators                       Number of obs =      2657
+----------------------------------------------------------------------------
+  test                        statistic        s.e.        z    P>|z|
+----------------------------------------------------------------------------
+  scale consistency            0.032354    0.214934    0.151   0.8803
+  one factor, R1 - R3         -0.183875    0.485981   -0.378   0.7052
+  J of the GMM, chi2(4)          2.5166                        0.6417
+----------------------------------------------------------------------------
+scale consistency: a1 against g2 a2 + g3 a3, the restriction model A
+    imposes and cannot test.  A rejection says the single-indicator
+    route would not be valid on these data.
+one factor: R1 equals a2/a3 under one factor; R3 needs symmetric V2
+    and V3 as well, so a rejection is against one factor AND that
+    symmetry, jointly.
+    The third-order cross-moments are not both measured (z < 2),
+    so the one-factor test has little power here.
+J: the eight moments the closed form leaves out, against the
+    one-factor linear structure itself.
+----------------------------------------------------------------------------
+
+. quietly freeiv lwage exper expersq black south smsa (educ fatheduc)
+
+. display "with fatheduc: g2 " %5.3f e(g2) ", a1 - (g2 a2 + g3 a3) " %5.3f e(sc_
+> d)
+with fatheduc: g2 0.035, a1 - (g2 a2 + g3 a3) 0.563
+
+. * two indicators the guards refuse: freeiv ends with r(498), e() posted
+. capture noisily freeiv lwage exper expersq black south smsa (educ IQ)
+
+Instrument-free estimation, two indicators Number of obs    =     2,061
+model: lwage on educ IQ, controls exper expersq black south smsa
+method: proxy  (Theorem 1, one latent confounder behind both)
+------------------------------------------------------------------------
+no estimate: guard 3 of Proposition 1 fired
+    an implied idiosyncratic variance is negative: the common
+    factor would have to explain more than the whole variance of
+    an indicator
+------------------------------------------------------------------------
+
+. display "return code " _rc ", guard " e(guard)
+return code 498, guard 3
+
+. capture noisily freeiv lwage exper expersq black south smsa (educ KWW)
+
+Instrument-free estimation, two indicators Number of obs    =     2,963
+model: lwage on educ KWW, controls exper expersq black south smsa
+method: proxy  (Theorem 1, one latent confounder behind both)
+------------------------------------------------------------------------
+no estimate: guard 1 of Proposition 1 fired
+    E[eps2^2 eps3] and E[eps2 eps3^2] do not share a sign, or the
+    second is numerically zero: the third moment of the confounder
+    is too weak to orient the loadings
+------------------------------------------------------------------------
+
+. display "return code " _rc ", guard " e(guard)
+return code 498, guard 1
+
+. 
+. * ======================================================================
+. * Section 4.6 -- a model the data refute
+. * ======================================================================
+. sysuse nlsw88, clear
+(NLSW, 1988 extract)
+
+. generate lwage = ln(wage)
+
+. freeiv lwage grade age i.race (tenure)
+
+Instrument-free estimation                 Number of obs    =     2,229
+model: lwage on tenure, controls grade age i.race
+method: qme
+------------------------------------------------------------------------
+    gamma (tenure)     0.045892  s.e. 0.003080   [ 0.039856,  0.051928]
+        z =  14.902    P>|z| = 0.0000
+note: the estimate lies OUTSIDE the identification bounds:
+      under scale consistency it implies a negative variance
+      (see the nuisances below, or -freeivdiag-)
+------------------------------------------------------------------------
+Identification
+    OLS slope, gamma-tilde = gamma (1 + c)   0.027353
+    bounds, c in [0, 1]                      [0.013677, 0.027353]
+    skewness of the first-stage residual     1.001465
+    discriminant D = 9m12^2 - 8m03m21        383.225137  (s.e. 67.760414)
+        D = gamma^2 (2A - B)^2 : z against 0 5.655590
+    roots of the quadratic                   -0.015164 and 0.045892
+        of which inside the bounds                    0
+note: NEITHER root lies in [gamma-tilde/2, gamma-tilde].
+      That interval is exactly the region where the implied
+      variances are non-negative, so the retained value is
+      not compatible with the model under scale consistency.
+      Read the J below, and freeivmenu, before using it.
+    R* = m12^2/(m03 m21)                     -0.301520
+        its floor is 8/9 when m03 m21 > 0
+------------------------------------------------------------------------
+Nuisances implied by the retained value
+    theta = alpha2^2 Var(U)                  -11.909884
+    sigma2_V2                                41.391705
+    sigma2_V1                                0.283163
+    c = theta/(theta + sigma2_V2)            -0.403974  the share the
+        bounds leave free: gamma = gamma-tilde/(1 + c)
+    E[(alpha2 U)^3], the confounder's        -88.751535
+    E[V2^3]                                  249.063991  (hme takes it 0)
+note: an implied variance is NEGATIVE, which no model can
+      produce.  The retained value lies outside the region
+      where scale consistency is feasible; the numbers just
+      above are arithmetic, not estimates.
+------------------------------------------------------------------------
+Over-identification at order four: nine moments, eight parameters
+    profiled GMM, method(pgmm): orders 2 and 3 fitted exactly
+        gamma                                0.027253
+        J, 1 df                                 26.6722   P>chi2 0.0000
+        the joint GMM, and the region where its J stays within
+        3.84 of its minimum: method(gmm) or method(all)
+    B kurt_U - A kurt_V2                     -5.523e+04   z  -2.05
+    The J tests alpha1 = gamma alpha2.  The Jacobian of the
+    model with alpha1 FREE has determinant -(gamma - tau)^5
+    times the factor above, so the restriction is testable
+    everywhere except where that factor vanishes -- and a
+    normal V2 sits exactly there, since it makes both B and
+    kurt_V2 zero.
+    The J rejects, so the rejection stands on its own and the
+    factor need not be read: it is computed at the restricted
+    estimates, which are not consistent under the alternative.
+    The factor's magnitude is NOT a calibrated measure of power;
+    only its vanishing, under the null, is meaningful.
+------------------------------------------------------------------------
+s.e.: delta method on the stacked moments; the estimation of the
+coefficients on X is accounted for.  The QME's own standard error is
+proportional to 1/sqrt(D): it explodes as the discriminant nears zero.
+
+. quietly freeiv lwage grade age i.race (tenure), method(gmm)
+
+. display "joint GMM: J " %4.1f e(J_gmm) ", p " %6.4f e(p_gmm)
+joint GMM: J 34.4, p 0.0000
+
+. 
+. * ======================================================================
+. * Section 4.8 -- Oster's range, and factor variables
+. * ======================================================================
+. use freeiv_card, clear
+
+. quietly freeiv lwage exper expersq black south smsa (educ), method(oster) rmax
+> (0.5)
+
+. display "oster, rmax(0.5): " %5.3f e(oster) "   (OLS " %5.3f e(ols) ")"
+oster, rmax(0.5): 0.098   (OLS 0.074)
+
+. quietly freeiv lwage exper expersq black south smsa (educ), method(oster) ///
+>     delta(2) rmax(0.8)
+
+. display "oster, delta(2) rmax(0.8): " %5.3f e(oster)
+oster, delta(2) rmax(0.8): 0.190
+
+. quietly freeiv lwage exper expersq black south smsa (educ), method(all)
+
+. local q1 = e(qme)
+
+. quietly freeiv lwage c.exper##c.exper i.black i.south i.smsa (educ), method(al
+> l)
+
+. display "factor variables: qme " %8.6f e(qme) " against " %8.6f `q1' ///
+>     " by hand (|difference| " %7.1e abs(e(qme) - `q1') ")"
+factor variables: qme 0.072146 against 0.072146 by hand (|difference|  2.7e-13)
+
+. 
+. * ======================================================================
+. * Section 5 -- what the third order cannot tell apart: no confounder,
+. * y1 = y2 + b y2^2 + e; the population value of the qme is 2/3 for every
+. * b != 0.  The same draws of y2 and e for both values of b.
+. * ======================================================================
+. foreach b in 0.10 0.02 {
+  2.     clear
+  3.     set seed 20260915
+  4.     quietly set obs 20000
+  5.     generate double y2 = rnormal()
+  6.     generate double y1 = y2 + `b'*y2^2 + rnormal()
+  7.     quietly freeiv y1 (y2), method(gmm)
+  8.     display "b = `b', n = " e(N) ": bounds [" %5.3f e(lo) ", " %5.3f e(hi) 
+> ///
+>         "], qme " %5.3f cond(e(at_vertex) == 1, e(vertex), e(qme)) ///
+>         cond(e(at_vertex) == 1, " (vertex)", "") ", z of D " %5.2f e(disc_z)
+  9.     display "    J of pgmm " %5.1f e(J_pgmm) " (p " %6.4f e(p_pgmm) ///
+>         "), J of gmm " %5.1f e(J_gmm) " (p " %6.4f e(p_gmm) ")"
+ 10. }
+b = 0.10, n = 20000: bounds [0.507, 1.013], qme 0.684, z of D  7.27
+    J of pgmm  36.1 (p 0.0000), J of gmm  37.4 (p 0.0000)
+b = 0.02, n = 20000: bounds [0.503, 1.007], qme 0.678, z of D  1.85
+    J of pgmm   4.0 (p 0.0456), J of gmm   4.0 (p 0.0442)
+
+. 
+. * ======================================================================
+. * The parts that need an internet connection
+. * ======================================================================
+. 
+. * Section 4.7 -- survey data
+. webuse nhanes2, clear
+
+. freeiv bpsystol age female black (bmi), vce(svy)
+
+Instrument-free estimation                 Number of obs    =    10,351
+                                           Number of strata =        31
+                                           Number of PSUs   =        62
+                                           Design df        =        31
+model: bpsystol on bmi, controls age female black
+method: qme
+------------------------------------------------------------------------
+    gamma (bmi)        0.962166  s.e. 0.077075   [ 0.804971,  1.119361]
+        t =  12.484    P>|t| = 0.0000
+note: negative discriminant -- the value shown is the vertex
+      3*m12/(4*m03), where the two roots merge; it coincides with
+      gamma when B = 2A, the very configuration where D vanishes
+------------------------------------------------------------------------
+Identification
+    OLS slope, gamma-tilde = gamma (1 + c)   1.256709
+    bounds, c in [0, 1]                      [0.628354, 1.256709]
+    skewness of the first-stage residual     1.251204
+    discriminant D = 9m12^2 - 8m03m21        -1.576e+05  (s.e. 6.428e+04)
+        D = gamma^2 (2A - B)^2 : z against 0 -2.452221
+note: D is NEGATIVE beyond its sampling noise.  Under the model
+      D = gamma^2 (2A - B)^2 cannot be below zero, so these data
+      reject the linear one-factor model with scale consistency,
+      and the vertex below is not an estimate.
+    no real root; vertex                     0.962166
+    R* = m12^2/(m03 m21)                     0.542935
+        its floor is 8/9 when m03 m21 > 0
+------------------------------------------------------------------------
+Nuisances implied by the retained value
+    theta = alpha2^2 Var(U)                  6.738858
+    sigma2_V2                                15.274578
+    sigma2_V1                                309.971127
+    c = theta/(theta + sigma2_V2)            0.306125  the share the
+        bounds leave free: gamma = gamma-tilde/(1 + c)
+    E[(alpha2 U)^3], the confounder's        43.076338
+    E[V2^3]                                  86.152677  (hme takes it 0)
+------------------------------------------------------------------------
+Over-identification at order four: nine moments, eight parameters
+    profiled GMM, method(pgmm): orders 2 and 3 fitted exactly
+        gamma                                0.931678
+        J, 1 df                                  9.5055   P>chi2 0.0020
+        the joint GMM, and the region where its J stays within
+        3.84 of its minimum: method(gmm) or method(all)
+    B kurt_U - A kurt_V2                     -4.212e+04   z  -1.54
+    The J tests alpha1 = gamma alpha2.  The Jacobian of the
+    model with alpha1 FREE has determinant -(gamma - tau)^5
+    times the factor above, so the restriction is testable
+    everywhere except where that factor vanishes -- and a
+    normal V2 sits exactly there, since it makes both B and
+    kurt_V2 zero.
+    The J rejects, so the rejection stands on its own and the
+    factor need not be read: it is computed at the restricted
+    estimates, which are not consistent under the alternative.
+    The factor's magnitude is NOT a calibrated measure of power;
+    only its vanishing, under the null, is meaningful.
+------------------------------------------------------------------------
+s.e.: delta method on the stacked moments; the estimation of the
+coefficients on X is accounted for.  The QME's own standard error is
+proportional to 1/sqrt(D): it explodes as the discriminant nears zero.
+Variance linearized over the design of svyset -- strata, PSUs and
+fpc of the first stage -- with t on 31 design degrees of freedom.
+
+. display "the design: s.e. of the OLS slope " %5.3f e(se_gt)
+the design: s.e. of the OLS slope 0.050
+
+. quietly freeiv bpsystol age female black (bmi) [pweight=finalwgt]
+
+. display "pweights alone: s.e. of the OLS slope " %5.3f e(se_gt)
+pweights alone: s.e. of the OLS slope 0.047
+
+. quietly freeiv bpsystol age female black (bmi), method(gmm) vce(svy)
+
+. display "joint GMM under the design: J " %4.1f e(J_gmm)
+joint GMM under the design: J  8.5
+
+. 
+. * Section 3.6 -- a route that often has no estimate: LSZ on wage1
+. use "http://fmwww.bc.edu/ec-p/data/wooldridge/wage1", clear
+
+. quietly freeiv lwage exper (educ), method(lsz)
+
+. display "wage1, full sample: lsz " %6.4f e(lsz) ", s.e. " %6.4f e(se_lsz)
+wage1, full sample: lsz 0.0244, s.e. 0.0190
+
+. set seed 20260913
+
+. bootstrap, reps(50) nodots: freeiv lwage exper (educ), method(lsz)
+------------------------------------------------------------------------------
+             |   Observed   Bootstrap                         Normal-based
+       lwage | coefficient  std. err.      z    P>|z|     [95% conf. interval]
+-------------+----------------------------------------------------------------
+        educ |   .0244438   .0196602     1.24   0.214    -.0140895    .0629771
+------------------------------------------------------------------------------
+bootstrap: 20 of 50 replications have an estimate (40%)
+    the statistics above are computed on these 20 only (help freeiv, bootstrap)
+------------------------------------------------------------------------
+Identification
+    OLS slope, gamma-tilde = gamma (1 + c)   0.097936
+    bounds, c in [0, 1]                      [0.048968, 0.097936]
+    skewness of the first-stage residual     -0.439629
+    discriminant D = 9m12^2 - 8m03m21        11.951379  (s.e. 6.958415)
+        D = gamma^2 (2A - B)^2 : z against 0 1.717543
+    roots of the quadratic                   0.086368 and -0.126865
+        of which inside the bounds                    1
+    R* = m12^2/(m03 m21)                     -0.033262
+        its floor is 8/9 when m03 m21 > 0
+------------------------------------------------------------------------
+Nuisances implied by the retained value
+    theta = alpha2^2 Var(U)                  20.984321
+    sigma2_V2                                -14.004803
+    sigma2_V1                                0.237244
+    c = theta/(theta + sigma2_V2)            3.006557  the share the
+        bounds leave free: gamma = gamma-tilde/(1 + c)
+    E[(alpha2 U)^3], the confounder's        17.059770
+    E[V2^3]                                  -25.166096  (hme takes it 0)
+note: an implied variance is NEGATIVE, which no model can
+      produce.  The retained value lies outside the region
+      where scale consistency is feasible; the numbers just
+      above are arithmetic, not estimates.
+------------------------------------------------------------------------
+Over-identification at order four: nine moments, eight parameters
+    profiled GMM, method(pgmm): orders 2 and 3 fitted exactly
+        gamma                                0.087684
+        J, 1 df                                  1.1753   P>chi2 0.2783
+        the joint GMM, and the region where its J stays within
+        3.84 of its minimum: method(gmm) or method(all)
+    B kurt_U - A kurt_V2                      -223.7439   z  -0.99
+    The J tests alpha1 = gamma alpha2.  The Jacobian of the
+    model with alpha1 FREE has determinant -(gamma - tau)^5
+    times the factor above, so the restriction is testable
+    everywhere except where that factor vanishes -- and a
+    normal V2 sits exactly there, since it makes both B and
+    kurt_V2 zero.
+    The J does not reject AND the factor is not distinguishable
+    from zero, so this non-rejection carries no information
+    about scale consistency: the design is near the surface
+    where the restriction cannot be tested at all.
+    The factor's magnitude is NOT a calibrated measure of power;
+    only its vanishing, under the null, is meaningful.
+------------------------------------------------------------------------
+s.e.: delta method on the stacked moments; the estimation of the
+coefficients on X is accounted for.  The QME's own standard error is
+proportional to 1/sqrt(D): it explodes as the discriminant nears zero.
+
+. display "the draws kept: mean " %6.4f el(e(b_bs), 1, 1) ", s.e. " %6.4f _se[ed
+> uc]
+the draws kept: mean 0.0410, s.e. 0.0197
+
+. * The same 50 draws, redrawn with -bsample- (the RNG state is restored around
+. * trigmm, so the draws stay aligned with the prefix's): where freeiv's solver
+. * finds no root, does trigmm, given 1,000 iterations, find one (criterion
+. * below 1e-9), or not?  About two minutes.
+. cap which trigmm
+
+. if (_rc == 0) {
+.     tempfile wage1 res
+.     quietly save `wage1'
+.     tempname P
+.     postfile `P' byte conv double tQ int trc using `res'
+.     set seed 20260913
+.     forvalues r = 1/50 {
+  2.         quietly use `wage1', clear
+  3.         bsample
+  4.         cap quietly freeiv lwage exper (educ), method(lsz)
+  5.         local conv = e(lsz_conv)
+  6.         local tQ = .
+  7.         local trc = .
+  8.         if (`conv' != 1) {
+  9.             local rng = c(rngstate)
+ 10.             cap quietly trigmm lwage educ, covariates(exper) p(0 1) iterate
+> (1000)
+ 11.             local trc = _rc
+ 12.             if (_rc == 0) local tQ = e(Q)
+ 13.             set rngstate `rng'
+ 14.         }
+ 15.         post `P' (`conv') (`tQ') (`trc')
+ 16.     }
+.     postclose `P'
+.     use `res', clear
+.     quietly count if conv == 1
+.     display "freeiv finds a root in " r(N) " of the 50 draws"
+freeiv finds a root in 20 of the 50 draws
+.     quietly count if conv != 1 & tQ < 1e-9
+.     display "  trigmm finds one in " r(N) " of the others"
+  trigmm finds one in 6 of the others
+.     quietly count if conv != 1 & tQ >= 1e-9 & tQ < 1e-5
+.     display "  trigmm stops near zero (1e-9 to 1e-5) in " r(N)
+  trigmm stops near zero (1e-9 to 1e-5) in 3
+.     quietly count if conv != 1 & (tQ >= 1e-5 | trc != 0)
+.     display "  trigmm finds none either in " r(N)
+  trigmm finds none either in 21
+. }
+
+. else display "(trigmm is not installed: ssc install trigmm)"
+
+. 
+. cd ..
+C:\Users\aabd\OneDrive\Desktop\freeiv_project
+
+. log close fivnote
+      name:  fivnote
+       log:  C:\Users\aabd\OneDrive\Desktop\freeiv_project\freeiv_note.log
+  log type:  text
+ closed on:   6 Oct 2026, 09:15:55
+--------------------------------------------------------------------------------

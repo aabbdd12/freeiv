@@ -1,13 +1,17 @@
-*! freeivreport 0.2.0  14sep2026  A. Araar (Universite Laval / PEP)
+*! freeivreport 1.0.0  06oct2026  A. Araar (Universite Laval / PEP)
 *! One command for the whole pipeline: what the data can carry, every route
 *! against the identified set, and the tests -- assembled into a single table
 *! that can be written straight to a file for a paper.
 *!
-*!   freeivreport depvar [indepvars] (endogvar) [if] [in] [fw pw aw]
-*!                [, SAVing(filename[, replace]) noMENU noTESTs
-*!                   Level(#) QUANtile(#) DELta(#) RMAX(#) SIGN(#) ]
+*!   freeivreport depvar [indepvars] (endogvar) [if] [in] [pw aw]
+*!                [, SAVing(filename[, replace]) noMENU noTESTs VCE(svy)
+*!                   Level(#) DELta(#) RMAX(#) SIGN(#) ]
 *!
 *!   freeivreport depvar [indepvars] (endogvar1 endogvar2) ...
+*!
+*! 1.0.0 follows freeiv 1.0.0: the routes in its order (the interval, order
+*! 3, order 4, the other maintained models), the removed routes and
+*! quantile() gone, vce(svy) passed on, fweights removed.
 *!
 *! The report is deliberately ordered the way the results should be read:
 *! identification first, estimates second, tests last.  An estimate is never
@@ -24,9 +28,9 @@ cap program drop _fivr_close
 
 program define freeivreport, rclass
     version 16
-    syntax anything(name=eqs equalok) [if] [in] [fw pw aw] ///
-        [, SAVing(string) noMENU noTESTs Level(cilevel) ///
-           QUANtile(real 0.25) DELta(real 1) RMAX(real -1) SIGN(real 1) ]
+    syntax anything(name=eqs equalok) [if] [in] [pw aw] ///
+        [, SAVing(string) noMENU noTESTs VCE(string) Level(cilevel) ///
+           DELta(real 1) RMAX(real -1) SIGN(real 1) ]
 
     * ---- how many endogenous variables ------------------------------------
     local p1 = strpos("`eqs'", "(")
@@ -46,41 +50,79 @@ program define freeivreport, rclass
     if (`rmax' >= 0) local rmopt "rmax(`rmax')"
     local wt ""
     if ("`weight'" != "") local wt "[`weight'`exp']"
+    * vce() is passed on as given; freeiv judges it before anything is written
+    local vceopt ""
+    if (`"`vce'"' != "") local vceopt "vce(`vce')"
+
+    * ======================= estimation =====================================
+    * with two endogenous regressors freeiv refuses the options that steer a
+    * one-endogenous route, so they must not be forwarded.  It runs first,
+    * so that an error stops the report before the file is opened.
+    if (`nend' == 2) {
+        * r(498) is a guard of Proposition 1: e() is posted and the report
+        * says which guard fired; any other error stops the report, shown
+        cap qui freeiv `eqs' `if' `in' `wt', level(`level') `vceopt'
+        local frc = _rc
+        local fguard = (`frc' == 498 & "`e(cmd)'" == "freeiv" & e(guard) != 0 & e(guard) < .)
+        if (`frc' & !`fguard') {
+            freeiv `eqs' `if' `in' `wt', level(`level') `vceopt'
+        }
+    }
+    else {
+        qui freeiv `eqs' `if' `in' `wt', method(all) level(`level') ///
+            delta(`delta') `rmopt' sign(`sign') `vceopt'
+    }
+    * the menu runs -regress- inside, which would replace e()
+    tempname est
+    _estimates hold `est', copy restore
 
     _fivr_open, saving(`saving')
     local fh "`r(fh)'"
 
     * ======================= identification ================================
+    * the menu weights as freeiv did: under vce(svy), by the weight of svyset
+    local mwt "`wt'"
+    if ("`e(vce)'" == "linearized" & "`e(wtype)'" != "") {
+        local mwt "[`e(wtype)' `e(wexp)']"
+    }
     if ("`menu'" == "" & `nend' == 1) {
-        cap qui freeivmenu `eqs' `if' `in' `wt', quantile(`quantile')
+        cap qui freeivmenu `eqs' `if' `in' `mwt'
         if (_rc == 0) {
             local m_zm03 = r(z_m03)
             local m_skew = r(skew2)
             local m_Flew = r(F_lewbel)
             local m_plew = r(p_lewbel)
             local m_dz   = r(disc_z)
-            local m_k    = r(k)
-            local m_ks   = r(kstar)
             local m_B    = r(B)
             local m_mu   = r(mu)
+            local m_atv  = r(at_vertex)
         }
     }
+    _estimates unhold `est'
 
-    * ======================= estimation =====================================
-    * with two endogenous regressors freeiv now refuses the options that
-    * steer a one-endogenous route, so they must not be forwarded
-    if (`nend' == 2) {
-        qui freeiv `eqs' `if' `in' `wt', level(`level')
+    * t on the design degrees of freedom under vce(svy), the normal otherwise
+    local st = cond(e(df_r) < ., "t", "z")
+
+    * n beside the model when the line leaves room for it, on its own line
+    * otherwise, so that nothing passes column 78
+    local mtext "`depvar' on `endog'"
+    if ("`exog'" != "") local mtext "`mtext', controls `exog'"
+    di
+    if (length("`mtext'") <= 34) {
+        di as txt "freeiv report" _col(30) as res "`mtext'" ///
+           _col(66) as txt "n = " as res %8.0f e(N)
     }
     else {
-        qui freeiv `eqs' `if' `in' `wt', method(all) level(`level') ///
-            quantile(`quantile') delta(`delta') `rmopt' sign(`sign')
+        di as txt "freeiv report" _col(66) "n = " as res %8.0f e(N)
+        di as res "`mtext'"
     }
-
-    di
-    di as txt "freeiv report" _col(30) as res "`depvar'" as txt " on " ///
-       as res "`endog'" as txt cond("`exog'" != "", ", controls " + "`exog'", "") ///
-       _col(66) "n = " as res %8.0f e(n)
+    if ("`e(vce)'" == "linearized") {
+        di as txt "variance linearized over the svyset design" _col(66) ///
+           "df = " as res %7.0f e(df_r)
+    }
+    else if ("`e(vce)'" == "robust") {
+        di as txt "variance in sandwich form for the sampling weights"
+    }
     di as txt "{hline 76}"
 
     if (`nend' == 1) {
@@ -94,33 +136,37 @@ program define freeivreport, rclass
                 `m_dz' . "`=cond(abs(`m_dz')>2,"usable","fragile")'" "`fh'"
             _fivr_row "identification" "F of eps2^2 on X (lewbel12)" ///
                 `m_Flew' . "`=cond(`m_plew'<0.05,"present","absent")'" "`fh'"
-            _fivr_row "identification" "k* (rre sets 1)" ///
-                `m_ks' . "`=cond(abs(`m_ks'-1)<0.5,"plausible","doubtful")'" "`fh'"
             _fivr_row "identification" "B = E[V2^3] (hme sets 0)" ///
-                `m_B' . "" "`fh'"
+                `m_B' . "`=cond(`m_atv'==1,"at the vertex","")'" "`fh'"
         }
 
         di as txt "{hline 76}"
         di as txt "ESTIMATES" _col(32) "estimate" _col(46) "s.e." _col(60) "vs the set"
-        foreach k in ols qme sce rre hme qbe gmm pgmm lsz lewbel12 copula ///
-                     rank rpiv ape oster {
+        * the order of freeiv: the interval (ols its upper end), order 3,
+        * order 4, the other maintained models
+        foreach k in ols qme hme gmm pgmm lsz lewbel12 copula rank oster {
             local kk "`k'"
+            local lab "`k'"
             if ("`k'" == "rank") local kk "g_rank"
-            * since 0.2.0 gmm is the JOINT nine-moment route of Araar (2026c)
-            * and pgmm the profiled one; they are different estimators
-            if ("`k'" == "gmm")  local kk "g_jgmm"
-            if ("`k'" == "pgmm") local kk "g_gmm"
+            * gmm is the JOINT nine-moment route of Araar (2026c) and pgmm the
+            * profiled one; they are different estimators
+            if ("`k'" == "gmm")  local kk "g_gmm"
+            if ("`k'" == "pgmm") local kk "g_pgmm"
             local v  = e(`kk')
             local se = .
             if ("`k'" == "ols") local se = e(se_gt)
             if ("`k'" == "qme") local se = e(se_qme)
-            if ("`k'" == "sce") local se = e(se_sce)
-            if ("`k'" == "rre") local se = e(se_rre)
             if ("`k'" == "hme") local se = e(se_hme)
+            * the qme retains the vertex when the discriminant is negative
+            if ("`k'" == "qme" & e(at_vertex) == 1) {
+                local v   = e(vertex)
+                local se  = e(se_vertex)
+                local lab "qme (vertex)"
+            }
             * suppressed, not absent: on the boundary there is nothing for the
             * delta method to expand around
-            if ("`k'" == "gmm")  local se = cond(e(j_bound), ., e(se_jgmm))
-            if ("`k'" == "pgmm") local se = e(se_gmm)
+            if ("`k'" == "gmm")  local se = cond(e(gmm_bound) == 1, ., e(se_gmm))
+            if ("`k'" == "pgmm") local se = e(se_pgmm)
             * a non-converged solver does not get to show a standard error
             if ("`k'" == "lsz") local se = cond(e(lsz_conv) != 1, ., e(se_lsz))
             local nt ""
@@ -133,8 +179,8 @@ program define freeivreport, rclass
                 else if (abs(`v' - e(lo)) < `tol')             local nt "at the lower bound"
                 else                                          local nt "inside"
             }
-            if ("`k'" == "lsz" & e(lsz_conv) != 1) local nt "`nt', DID NOT CONVERGE"
-            _fivr_row "estimate" "`k'" `v' `se' "`nt'" "`fh'"
+            if ("`k'" == "lsz" & e(lsz_conv) != 1) local nt "NOT CONVERGED"
+            _fivr_row "estimate" "`lab'" `v' `se' "`nt'" "`fh'"
         }
         _fivr_row "estimate" "identified set" . . ///
             "[`=string(e(lo),"%7.5f")', `=string(e(hi),"%7.5f")']" "`fh'"
@@ -142,17 +188,22 @@ program define freeivreport, rclass
         if ("`tests'" == "") {
             di as txt "{hline 76}"
             di as txt "TESTS" _col(32) "statistic" _col(46) "p" _col(60) "tests"
-            cap qui freeivtest, level(`level')
+            cap qui freeivtest
             if (_rc == 0) {
-                _fivr_row "test" "endogeneity, chi2(2)" `=r(W_endo)' ///
-                    `=r(p_endo)' "theta = 0" "`fh'"
-                _fivr_row "test" "qme - ols, z" `=r(z_ols)' . "theta = 0" "`fh'"
-                _fivr_row "test" "qme - rre, z" `=r(z_rre)' . "k* = 1" "`fh'"
-                _fivr_row "test" "qme - sce, z" `=r(z_sce)' . "k = 1" "`fh'"
-                _fivr_row "test" "qme - hme, z" `=r(z_hme)' . "B = 0" "`fh'"
+                local ref "`r(ref)'"
+                if (r(F_endo) < .) {
+                    _fivr_row "test" "endogeneity, adjusted F" `=r(F_endo)' ///
+                        `=r(p_endo)' "theta = 0" "`fh'"
+                }
+                else {
+                    _fivr_row "test" "endogeneity, chi2(2)" `=r(W_endo)' ///
+                        `=r(p_endo)' "theta = 0" "`fh'"
+                }
+                _fivr_row "test" "`ref' - ols, `st'" `=r(z_ols)' . "theta = 0" "`fh'"
+                _fivr_row "test" "`ref' - hme, `st'" `=r(z_hme)' . "B = 0" "`fh'"
             }
-            _fivr_row "test" "GMM 2-3-4 joint, J chi2(1)" `=e(J9)' `=e(p_J9)' ///
-                "scale consistency + linearity" "`fh'"
+            _fivr_row "test" "joint GMM, J chi2(1)" `=e(J_gmm)' `=e(p_gmm)' ///
+                "SC and linearity" "`fh'"
             * the region is valid where the standard error is not, so it is
             * reported whenever the minimum sits on a boundary -- and its
             * share of the identified interval says what the higher moments
@@ -165,14 +216,14 @@ program define freeivreport, rclass
                     di as txt "      add nothing to the assumption-free bounds here"
                 }
             }
-            if (e(j_bound) == 1) {
+            if (e(gmm_bound) == 1) {
                 di as txt "      the joint minimum is on the boundary, so its s.e."
                 di as txt "      and the chi2(1) law for its J are both invalid"
             }
-            _fivr_row "test" "GMM 2-3-4 profiled, J chi2(1)" `=e(J)' `=e(p_J)' ///
-                "h1..h5 forced to zero" "`fh'"
+            _fivr_row "test" "profiled GMM, J chi2(1)" `=e(J_pgmm)' ///
+                `=e(p_pgmm)' "orders 2-3 exact" "`fh'"
             _fivr_row "test" "  its identification factor" `=e(z_idfac)' . ///
-                "`=cond(abs(e(z_idfac))<2,"near the knife edge","usable")'" "`fh'"
+                "`=cond(abs(e(z_idfac))<2,"near knife edge","usable")'" "`fh'"
         }
     }
 
@@ -182,20 +233,20 @@ program define freeivreport, rclass
         _fivr_row "estimate" "g2 (`=word("`endog'",1)')" `=e(g2)' `=e(se_g2)' "" "`fh'"
         _fivr_row "estimate" "g3 (`=word("`endog'",2)')" `=e(g3)' `=e(se_g3)' "" "`fh'"
         _fivr_row "estimate" "a1 (free loading of U)" `=e(a1)' `=e(se_a1)' "" "`fh'"
-        _fivr_row "estimate" "g2 a2 + g3 a3" `=e(sc)' . "model A would call this a1" "`fh'"
+        _fivr_row "estimate" "g2 a2 + g3 a3" `=e(sc)' . "model A's a1" "`fh'"
         _fivr_row "estimate" "condition number" `=e(cnum)' . ///
             "`=cond(e(cnum)>100,"ill conditioned","")'" "`fh'"
         _fivr_row "estimate" "`=e(endog3)' as an instrument" `=e(ivgap)' . ///
-            "compare with g2 above" "`fh'"
+            "vs g2 above" "`fh'"
 
         di as txt "{hline 76}"
         di as txt "TESTS" _col(32) "statistic" _col(46) "s.e. / p"
         _fivr_row "test" "scale consistency, a1 - sc" ///
-            `=e(sc_d)' `=e(se_sc)' "z = `=string(e(z_sc),"%6.3f")'" "`fh'"
+            `=e(sc_d)' `=e(se_sc)' "`st' = `=string(e(z_sc),"%6.3f")'" "`fh'"
         _fivr_row "test" "one factor, R1 - R3" `=e(of_d)' `=e(se_of)' ///
-            "z = `=string(e(z_of),"%6.3f")'; needs symmetric V" "`fh'"
+            "`st' = `=string(e(z_of),"%6.3f")'" "`fh'"
         _fivr_row "test" "GMM16, J chi2(4)" `=e(q_J)' `=e(q_pJ)' ///
-            "the one-factor linear structure" "`fh'"
+            "one factor, linear" "`fh'"
         _fivr_row "test" "guard of Proposition 1" `=e(guard)' . ///
             "`=cond(e(guard)==0,"none fired","a guard fired")'" "`fh'"
     }
@@ -206,11 +257,12 @@ program define freeivreport, rclass
     di as txt "identified set, the third what the data say about the assumptions."
     _fivr_close, fh("`fh'") saving(`saving')
 
-    return scalar n = e(n)
+    return scalar n = e(N)
     if (`nend' == 1) {
         return scalar lo = e(lo)
         return scalar hi = e(hi)
         return scalar qme = e(qme)
+        return scalar gamma = e(gamma)
     }
     return local endog "`endog'"
     return local depvar "`depvar'"

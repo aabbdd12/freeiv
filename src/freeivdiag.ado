@@ -1,4 +1,4 @@
-*! freeivdiag 0.2.0  13sep2026  A. Araar (Universite Laval / PEP)
+*! freeivdiag 1.0.0  06oct2026  A. Araar (Universite Laval / PEP)
 *! Post-estimation diagnostic: the nuisance parameters implied by a value of
 *! gamma, and what they say about the model.
 *!
@@ -6,14 +6,21 @@
 *!
 *! The second-order system pins theta, sigma2_V1 and sigma2_V2 as functions of
 *! gamma ALONE.  The diagnostic is therefore method free: hand it the estimate
-*! from the QME, the SCE, the RRE, GMM, Lewbel (2012) or LSZ and it will say
-*! what each of them implies.  gamma(#) evaluates an outside value.
+*! from the QME, the HME, the GMM, Lewbel (2012) or LSZ and it will say what
+*! each of them implies.  gamma(#) evaluates an outside value.
 *!
 *! The partial identification bounds ARE the positivity constraints:
 *!   theta >= 0      is equivalent to   gamma <= gamma-tilde
 *!   sigma2_V2 >= 0  is equivalent to   gamma >= gamma-tilde / 2
 *! An estimate outside the bounds therefore implies a negative variance, and
-*! the command says so.
+*! the command says so.  Equivalently, c = theta/(theta + sigma2_V2), the
+*! share of the confounder in the variance of the first-stage residual, must
+*! lie in [0, 1]: gamma = gamma-tilde/(1 + c).
+*!
+*! 1.0.0 replaces k and k*, the ratios the removed equal-variance routes set
+*! to 1, by c; places a value on the bounds with the tolerance of freeiv, so
+*! that an end typed with its printed digits is not called outside; and
+*! names the value after method(all), qme or vertex.
 
 cap program drop freeivdiag
 
@@ -25,10 +32,15 @@ program define freeivdiag, rclass
         di as err "freeivdiag is used after freeiv"
         exit 301
     }
+    if ("`e(model)'" == "B") {
+        di as err "freeivdiag reads the one-endogenous model; the two-indicator"
+        di as err "    model reports the confounder it recovers in its own output"
+        exit 198
+    }
 
     tempname M
     matrix `M' = e(moments)
-    local vals "n sum_w m02 m11 m20 m03 m12 m21 m30 m04 m13 m22 m02c m11c m20c gt skew2 lo hi disc disc_se disc_z vertex rstar root1 root2 nroots qme sce rre hme ols qbe qbe_R qbe_q1 qbe_skew qbe_exk qbe_nsub qbe_clip qbe_dom theta sV2 sV1 k kstar A B mu se_gt se_lo se_qme se_sce se_rre se_hme se_vertex"
+    local vals : colnames `M'
     local j = 0
     foreach v of local vals {
         local ++j
@@ -38,6 +50,8 @@ program define freeivdiag, rclass
     if (`gamma' == -99999) {
         local g = e(gamma)
         local src "`e(method)'"
+        * method(all) retains the value of method(qme): name that one
+        if ("`src'" == "all") local src = cond("`e(qme_flag)'" == "vertex", "vertex", "qme")
     }
     else {
         local g = `gamma'
@@ -60,8 +74,7 @@ program define freeivdiag, rclass
     if (abs(`s2') < `tol') local s2 = 0
     if (abs(`s1') < `tol') local s1 = 0
 
-    local kk  = cond(`s2' != 0, `s1' / `s2', .)
-    local kks = cond(`kk' < ., `kk' / `g'^2, .)
+    local sh  = cond(`m02c' > 0, `th' / `m02c', .)
     local Ag  = `m12' / `g' - `m03'
     local Bg  = 2 * `m03' - `m12' / `g'
     local mug = cond(`m03' != 0, `Ag' / `m03', .)
@@ -82,12 +95,18 @@ program define freeivdiag, rclass
     di as txt "{hline 72}"
     di as txt "Position inside the identification interval"
     di as txt "    bounds [" as res %8.6f `lo' as txt ", " as res %8.6f `hi' as txt "]"
-    if (`g' < `lo' | `g' > `hi') {
+    * the tolerance of freeiv's own "outside the bounds": an end of the
+    * interval typed with its printed digits, gamma(0.5645767294) for a
+    * gamma-tilde of 0.56457672937..., is that end, not a value outside it
+    local ptol = 1e-8 * max(abs(`lo'), abs(`hi'), 1)
+    local outb = (`g' < `lo' - `ptol' | `g' > `hi' + `ptol')
+    if (`outb') {
         di as res "    OUTSIDE the bounds: under scale consistency this value"
         di as res "    implies a negative variance (see below)"
     }
     else {
         local pos = cond(`hi' > `lo', 100 * (`g' - `lo') / (`hi' - `lo'), .)
+        if (`pos' < .) local pos = min(max(`pos', 0), 100)
         di as txt "    relative position" _col(46) as res %9.1f `pos' as txt " %"
     }
 
@@ -99,14 +118,9 @@ program define freeivdiag, rclass
        as txt cond(`s2' < 0, "   NEGATIVE", "")
     di as txt "    sigma2_V1" _col(46) as res %12.6f `s1' ///
        as txt cond(`s1' < 0, "   NEGATIVE", "")
-    di as txt "    k = sigma2_V1 / sigma2_V2" _col(46) as res %12.6f `kk' ///
-       as txt cond(`kk' >= ., "   not identified", ///
-                   cond(abs(`kk' - 1) < 0.5, "   near 1", "   far from 1"))
-    di as txt "    k* = k / gamma^2" _col(46) as res %12.6f `kks' ///
-       as txt cond(`kks' >= ., "   not identified", ///
-                   cond(abs(`kks' - 1) < 0.5, "   near 1", "   far from 1"))
-    local sh = cond(`m02c' > 0, `th' / `m02c', .)
-    di as txt "    share of the confounder in Var(eps2)" _col(46) as res %12.4f `sh'
+    di as txt "    c = theta/(theta + sigma2_V2)" _col(46) as res %12.4f `sh' ///
+       as txt cond(`sh' < 0 | (`sh' > 1 & `sh' < .), "   outside [0, 1]", "")
+    di as txt "        the confounder's share of Var(eps2); gamma-tilde = gamma (1 + c)"
 
     di as txt "{hline 72}"
     di as txt "Third moment"
@@ -130,17 +144,6 @@ program define freeivdiag, rclass
         di as res "these data"
         local ++nw
     }
-    if (`kks' < . & abs(`kks' - 1) > 0.5) {
-        di as res "warning: k* departs from 1, so the scale-free equal-variance"
-        di as res "restriction behind the RRE is doubtful here"
-        local ++nw
-    }
-    if (`kk' < . & abs(`kk' - 1) > 0.5) {
-        di as res "warning: k departs from 1, so the equal-variance assumption of the"
-        di as res "SCE is doubtful -- and note that k is not invariant to the units of"
-        di as res "`e(depvar)' and `e(endog)', which is why k* is the one to read"
-        local ++nw
-    }
     if (`Bg' < . & `m03' != 0 & abs(`Bg' / `m03') > 0.2) {
         di as res "warning: B departs from 0, so the symmetry assumption of V2 on which"
         di as res "the HME rests is doubtful"
@@ -152,14 +155,13 @@ program define freeivdiag, rclass
     return scalar theta = `th'
     return scalar sV2   = `s2'
     return scalar sV1   = `s1'
-    return scalar k     = `kk'
-    return scalar kstar = `kks'
+    return scalar cshare = `sh'
     return scalar A     = `Ag'
     return scalar B     = `Bg'
     return scalar mu    = `mug'
     return scalar kurtU = `kU'
     return scalar lo    = `lo'
     return scalar hi    = `hi'
-    return scalar inbounds = (`g' >= `lo' & `g' <= `hi')
+    return scalar inbounds = !`outb'
     return local  source "`src'"
 end

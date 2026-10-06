@@ -1,6 +1,7 @@
-*! freeiv_mata 0.3.1  15sep2026  A. Araar
+*! freeiv_mata 1.0.0  06oct2026  A. Araar
 *! Mata engine of freeiv: residuals, moments of orders 2-3-4, the closed forms
-*! of model A (bounds, QME, SCE, RRE, HME, Q-BE) and the discriminant test.
+*! of model A (bounds, QME, HME), the discriminant test, the covariance of the
+*! moment contributions (no weight or aweights, pweights, vce(svy)).
 *! Kept in a separate file because an ado-file loaded automatically does not
 *! execute its mata: block; freeiv_engine.ado sources it on demand.
 
@@ -27,30 +28,6 @@ real colvector _fiv_resid(real colvector y, real matrix X, real colvector w)
 real colvector _fiv_ols(real colvector y, real matrix X, real colvector w)
 {
     return(invsym(quadcross(X, w, X)) * quadcross(X, w, y))
-}
-
-/* Root of the SCE cubic: 2g^3 - 3gt g^2 + (R-2) g + gt = 0                */
-real scalar _fiv_sce(real scalar gt, real scalar R, real scalar tol)
-{
-    real rowvector rt
-    real scalar i, lo, hi, best, bd, rr
-    rt   = polyroots((gt, R - 2, -3 * gt, 2))
-    lo   = gt / 2 - tol
-    hi   = gt + tol
-    best = .
-    bd   = .
-    for (i = 1; i <= cols(rt); i++) {
-        if (abs(Im(rt[i])) < 1e-8) {
-            rr = Re(rt[i])
-            if (rr >= lo & rr <= hi) {
-                if (abs(rr - 0.75 * gt) < bd | bd == .) {
-                    bd   = abs(rr - 0.75 * gt)
-                    best = rr
-                }
-            }
-        }
-    }
-    return(best)
 }
 
 
@@ -89,6 +66,158 @@ real scalar _fiv_se(real rowvector g, real matrix V, real scalar n)
     return(v > 0 ? sqrt(v) : .)
 }
 
+/* ------------------------------------------------------------------ *
+ * The covariance of the moment contributions.  Every standard error  *
+ * of freeiv is a delta method on Vm/n, Vm being the covariance of the *
+ * influence values of the moments, so the weights and vce() enter     *
+ * through this one function:                                          *
+ *   no design set   sum w psi psi' / sum w   (no weight, aweights)    *
+ *   design set      n times the design-based variance of the moment   *
+ *                   means: pweights alone are a design in which every *
+ *                   observation is its own primary unit (the          *
+ *                   sandwich); vce(svy) brings the strata, the PSUs   *
+ *                   and the fpc of svyset (Taylor linearization,      *
+ *                   first stage)                                       *
+ * freeiv.ado sets the design before the engines run and clears it     *
+ * after, so freeivmenu and the other commands never see a stale one.  *
+ * ------------------------------------------------------------------ */
+/* the strata and PSU identifiers as numbers: a string identifier becomes
+   the rank of its distinct values, computed here so that the data in
+   memory are never re-sorted                                            */
+real colvector _fiv_codes(string scalar v, string scalar tousev)
+{
+    string colvector s
+    real colvector   o, c
+    real scalar      i, k
+    if (!st_isstrvar(v)) return(st_data(., v, tousev))
+    s = st_sdata(., v, tousev)
+    c = J(rows(s), 1, .)
+    if (rows(s) == 0) return(c)
+    o = order(s, 1)
+    k = 1
+    c[o[1]] = 1
+    for (i = 2; i <= rows(s); i++) {
+        if (s[o[i]] != s[o[i - 1]]) k++
+        c[o[i]] = k
+    }
+    return(c)
+}
+
+void _fiv_vset(string scalar strv, string scalar psuv, string scalar fpcv,
+               string scalar tousev, real scalar certainty)
+{
+    pointer(real matrix) scalar p
+    real colvector s, u, f
+    real scalar n
+    rmexternal("__fiv_vdesign")
+    rmexternal("__fiv_vcert")
+    n = rows(st_data(., tousev, tousev))
+    if (strv != "") s = _fiv_codes(strv, tousev)
+    else            s = J(n, 1, 1)
+    if (psuv != "") u = _fiv_codes(psuv, tousev)
+    else            u = (1::n)
+    if (fpcv != "") f = st_data(., fpcv, tousev)
+    else            f = J(n, 1, 0)
+    p  = crexternal("__fiv_vdesign")
+    *p = (s, u, f)
+    p  = crexternal("__fiv_vcert")
+    *p = certainty
+}
+
+void _fiv_vclear()
+{
+    rmexternal("__fiv_vdesign")
+    rmexternal("__fiv_vcert")
+}
+
+/* (number of strata, number of PSUs, strata with a single PSU) of the
+   design currently set; missing when none is                           */
+real rowvector _fiv_vinfo()
+{
+    pointer(real matrix) scalar p
+    real matrix    D, info, infoh
+    real colvector o, s, u, g, sp
+    real scalar    n, h, ns
+    p = findexternal("__fiv_vdesign")
+    if (p == NULL) return((., ., .))
+    D = *p
+    n = rows(D)
+    if (n == 0) return((., ., .))
+    o = order((D[., 1..2], (1::n)), (1, 2, 3))
+    s = D[o, 1]
+    u = D[o, 2]
+    if (n > 1) g = runningsum(1 \ ((s[2::n] :!= s[1::n-1]) :| (u[2::n] :!= u[1::n-1])))
+    else       g = 1
+    info  = panelsetup(g, 1)
+    sp    = s[info[., 1]]
+    infoh = panelsetup(sp, 1)
+    ns = 0
+    for (h = 1; h <= rows(infoh); h++) {
+        if (infoh[h, 2] == infoh[h, 1]) ns++
+    }
+    return((rows(infoh), rows(info), ns))
+}
+
+/* the design-based variance of the weighted means of the columns of P:
+   linearized values u_i = w_i P_i / sum w, totals by PSU, deviations from
+   the stratum mean, (1 - f_h) n_h/(n_h - 1) per stratum.  A stratum with a
+   single PSU makes the variance missing (svyset's default) unless the
+   design says singleunit(certainty), which drops its contribution.       */
+real matrix _fiv_dvar(real matrix P, real colvector w, real matrix D,
+                      real scalar cert)
+{
+    real matrix    U, Z, V, info, infoh, Zh, dev
+    real colvector o, s, u, f, g, sp, fp
+    real scalar    n, k, h, nh, fh
+    n  = rows(P)
+    k  = cols(P)
+    U  = (w :* P) / quadsum(w)
+    /* the observations of a PSU are ties of this sort, and order() does not
+       keep ties in a fixed order: the sums by PSU then ran in an order that
+       changed from one call to the next, a difference of 1e-16 that the
+       search of the profiled GMM amplified to 1e-6 (the lock of 1.0.0 saw
+       it).  The position of the observation, as last key, fixes the order. */
+    o  = order((D[., 1..2], (1::n)), (1, 2, 3))
+    U  = U[o, .]
+    s  = D[o, 1]
+    u  = D[o, 2]
+    f  = D[o, 3]
+    if (n > 1) g = runningsum(1 \ ((s[2::n] :!= s[1::n-1]) :| (u[2::n] :!= u[1::n-1])))
+    else       g = 1
+    info = panelsetup(g, 1)
+    Z    = panelsum(U, info)
+    sp   = s[info[., 1]]
+    fp   = f[info[., 1]]
+    infoh = panelsetup(sp, 1)
+    V = J(k, k, 0)
+    for (h = 1; h <= rows(infoh); h++) {
+        Zh = panelsubmatrix(Z, h, infoh)
+        nh = rows(Zh)
+        if (nh < 2) {
+            if (cert == 1) continue
+            return(J(k, k, .))
+        }
+        /* svyset's convention: an fpc at most 1 is a sampling rate, above
+           1 it is the number of PSUs in the stratum                       */
+        fh = fp[infoh[h, 1]]
+        if (fh > 1)      fh = nh / fh
+        else if (fh < 0) fh = 0
+        dev = Zh :- mean(Zh)
+        V   = V + (1 - fh) * nh / (nh - 1) * quadcross(dev, dev)
+    }
+    return(V)
+}
+
+real matrix _fiv_cov(real matrix P, real colvector w)
+{
+    pointer(real matrix) scalar p, pc
+    p = findexternal("__fiv_vdesign")
+    if (p == NULL) return(quadcross(P, w, P) / quadsum(w))
+    if (rows(*p) != rows(P)) return(quadcross(P, w, P) / quadsum(w))
+    pc = findexternal("__fiv_vcert")
+    return(rows(P) * _fiv_dvar(P, w, *p, (pc == NULL ? 0 : *pc)))
+}
+
 end
 
 version 16
@@ -96,21 +225,19 @@ mata:
 mata set matastrict off
 
 void _freeiv_all(string scalar y1v, string scalar y2v, string scalar xv,
-                 string scalar wv, string scalar tousev, real scalar qq,
+                 string scalar wv, string scalar tousev,
                  string scalar xiv, string scalar e2v)
 {
-    real colvector y1, y2, w, xi, e2, ord, dvec
-    real matrix    X, Xq, Pm, Pc, Sm, Zq, res
-    real scalar    n, sw, cc, i, nk
+    real colvector y1, y2, w, xi, e2, dvec
+    real matrix    X, Pm, Pc, Sm, Zq, res
+    real scalar    n, sw, cc
     real scalar    m02, m11, m20, m03, m12, m21, m30, m04, m13, m22
-    real scalar    m02c, m11c, m20c, gt, sk2, lo, hi, R
+    real scalar    m02c, m11c, m20c, gt, sk2, lo, hi
     real scalar    D, Dse, Dz, vertex, rst, r1, r2, nin, ss
-    real scalar    qme, sce, rre, hme, olsg, theta, sV2, sV1, kk, kst
-    real scalar    qbe, qR, qq1, qsk, qek, m2c, m3c, m4c, nsub, clip, dom, cut
-    real scalar    se_gt, se_lo, se_qme, se_sce, se_rre, se_hme, se_ver
-    real scalar    den, dFdg, rr, cc2, AA, BB, muu
-    real colvector sel
-    real rowvector mv, gv, gv2, gq, gs, gh, gr, dgt, dR
+    real scalar    qme, hme, olsg, theta, sV2, sV1, csh, gref, atv
+    real scalar    se_gt, se_lo, se_qme, se_hme, se_ver
+    real scalar    den, rr, cc2, AA, BB, muu
+    real rowvector mv, gv, gv2, gq, gh
     real matrix    Pinf, Vm
     string rowvector cn
 
@@ -154,7 +281,7 @@ void _freeiv_all(string scalar y1v, string scalar y2v, string scalar xv,
     D    = 9 * m12^2 - 8 * m03 * m21
     Pm   = e2:^3, xi :* e2:^2, xi:^2 :* e2
     Pc   = Pm :- (m03, m12, m21)
-    Sm   = quadcross(Pc, w, Pc) / sw
+    Sm   = _fiv_cov(Pc, w)
     dvec = (-8 * m21 \ 18 * m12 \ -8 * m03)
     ss   = (dvec' * Sm * dvec) / n
     Dse  = (ss > 0 ? sqrt(ss) : .)
@@ -176,21 +303,15 @@ void _freeiv_all(string scalar y1v, string scalar y2v, string scalar xv,
         else qme = (abs(r1 - 0.75 * gt) <= abs(r2 - 0.75 * gt) ? r1 : r2)
     }
 
-    /* ---- SCE, RRE and HME ----------------------------------------------
-       The SCE imposes sV1 = sV2.  That ratio compares a variance in the units
-       of y1 with a variance in the units of y2, so it is not scale free and
-       the estimate moves when either variable is rewritten in other units.
-       The RRE imposes the scale-free counterpart sV1 = gamma^2 sV2, which
-       turns the second-order system into m20 = 2 gamma m11, a single closed
-       form with no root selection.  Cauchy-Schwarz (m11^2 <= m20 m02) puts it
-       at or above the lower bound always; only the upper bound can fail, and
-       when it does the restriction itself is rejected.                     */
-    R   = m20c / m02c
-    sce = _fiv_sce(gt, R, 0.05)
-    rre = (m11c != 0 ? m20c / (2 * m11c) : .)
+    /* ---- HME: the cube root under symmetric V1 and V2 -------------------
+       m30/m03 = 8 gamma^3 when V1 and V2 are symmetric, so the ratio has the
+       sign of gamma, which is the sign of gamma-tilde (c >= 0): the real
+       cube root, negative for a negative effect.  A ratio of the other sign
+       cannot come from that model, and the route then returns nothing.    */
     hme = .
     if (abs(m03) >= 1e-6) {
-        if (m30 / m03 > 0) hme = 0.5 * (m30 / m03)^(1 / 3)
+        rr = m30 / m03
+        if (rr * gt > 0) hme = 0.5 * sign(rr) * abs(rr)^(1 / 3)
     }
 
     /* ---- OLS of y1 on (1, X, y2) --------------------------------------- */
@@ -198,65 +319,28 @@ void _freeiv_all(string scalar y1v, string scalar y2v, string scalar xv,
     res  = _fiv_ols(y1, Zq, w)
     olsg = res[rows(res), 1]
 
-    /* ---- Q-BE: subsample of the qq% SMALLEST values of e2 --------------- */
-    m2c = _fiv_m((e2 :- _fiv_m(e2, w, sw)):^2, w, sw)
-    m3c = _fiv_m((e2 :- _fiv_m(e2, w, sw)):^3, w, sw)
-    m4c = _fiv_m((e2 :- _fiv_m(e2, w, sw)):^4, w, sw)
-    qsk = (m2c > 0 ? m3c / m2c^1.5 : .)
-    qek = (m2c > 0 ? m4c / m2c^2 - 3 : .)
-    qR  = 0.824 - 1.778 * qsk + 0.337 * qek
-    if (qR < 0.05) qR = 0.05
-    if (qR > 0.95) qR = 0.95
-    qbe  = .
-    qq1  = .
-    nsub = .
-    clip = (qR <= 0.05 + 1e-12) - (qR >= 0.95 - 1e-12)
-    ord  = order(e2, 1)
-    nk   = ceil(qq * n)
-    if (nk >= 10 & nk < n) {
-        cut  = e2[ord[nk]]
-        sel  = selectindex(e2 :<= cut)
-        nsub = rows(sel)
-        if (nsub >= 10) {
-            Xq  = Zq[sel, .]
-            res = _fiv_ols(y1[sel], Xq, w[sel])
-            qq1 = res[rows(res), 1]
-            qbe = olsg - (olsg - qq1) / (1 - qR)
-        }
-    }
-    /* Domain of validity: the ARAARP3 calibration was fitted on eight laws of
-       U with POSITIVE skewness; the paper itself warns that a skewness near
-       zero makes the estimator fail.                                       */
-    dom = (qsk < . & qsk > 0.2 & clip == 0)
-
-    /* ---- A, B and mu implied by the retained value ----------------------
+    /* ---- what the retained third-order value implies ---------------------
        m03 = A + B and m12 = gamma (2A + B) give A = m12/gamma - m03 and
        B = 2 m03 - m12/gamma.  B = 0 is the symmetry assumption of the HME,
-       and mu = A/(A+B) is the confounder's share of the third moment.      */
-    AA = .
-    BB = .
-    muu = .
-    if (qme < . & qme != 0) {
-        AA  = m12 / qme - m03
-        BB  = 2 * m03 - m12 / qme
-        muu = (m03 != 0 ? AA / m03 : .)
-    }
-
-    /* ---- nuisances implied by the retained QME value --------------------
-       k = sV1/sV2 is what the SCE sets to 1 and is unit dependent;
-       kstar = sV1/(gamma^2 sV2) is its scale-free counterpart and is what
-       the RRE sets to 1.                                                   */
-    theta = .
-    sV2   = .
-    sV1   = .
-    kk    = .
-    kst   = .
-    if (qme < . & qme != 0) {
-        theta = m02c * (gt - qme) / qme
+       and mu = A/(A+B) is the confounder's share of the third moment.  The
+       second-order system then gives theta, sV2, sV1 and the share
+       c = theta/(theta + sV2) = theta/m02, the one number the second order
+       cannot give: gamma = gamma-tilde/(1 + c).  They are evaluated at the
+       QME root, or at the vertex when the discriminant is negative -- the
+       value the default route retains then (atv = 1), where B = 2A by
+       construction.                                                       */
+    gref = (qme < . ? qme : (D < 0 ? vertex : .))
+    atv  = (qme < . ? 0 : (gref < . ? 1 : .))
+    AA = .; BB = .; muu = .
+    theta = .; sV2 = .; sV1 = .; csh = .
+    if (gref < . & gref != 0) {
+        AA    = m12 / gref - m03
+        BB    = 2 * m03 - m12 / gref
+        muu   = (m03 != 0 ? AA / m03 : .)
+        theta = m02c * (gt - gref) / gref
         sV2   = m02c - theta
-        sV1   = m20c - qme^2 * m02c - 3 * qme^2 * theta
-        kk    = (sV2 != 0 ? sV1 / sV2 : .)
-        kst   = (kk < . ? kk / qme^2 : .)
+        sV1   = m20c - gref^2 * m02c - 3 * gref^2 * theta
+        csh   = (m02c != 0 ? theta / m02c : .)
     }
 
     /* ---- analytic standard errors --------------------------------------
@@ -266,8 +350,8 @@ void _freeiv_all(string scalar y1v, string scalar y2v, string scalar xv,
        estimators has variance (g_a - g_b)' V (g_a - g_b) / n.            */
     mv   = (m02, m11, m20, m03, m12, m21, m30, m04, m13, m22)
     Pinf = _fiv_infl(xi, e2, X, w, mv)
-    Vm   = quadcross(Pinf, w, Pinf) / sw
-    gq = J(1, 10, .); gs = J(1, 10, .); gh = J(1, 10, .); gr = J(1, 10, .)
+    Vm   = _fiv_cov(Pinf, w)
+    gq = J(1, 10, .); gh = J(1, 10, .)
 
     gv    = J(1, 10, 0)
     gv[2] = 1 / m02
@@ -292,63 +376,40 @@ void _freeiv_all(string scalar y1v, string scalar y2v, string scalar xv,
     gv2[4] = -3 * m12 / (4 * m03^2)
     se_ver = _fiv_se(gv2, Vm, n)
 
-    se_sce = .
-    if (sce < .) {
-        dFdg = 6 * sce^2 - 6 * gt * sce + (m20 / m02 - 2)
-        if (dFdg != 0) {
-            dgt    = J(1, 10, 0); dgt[2] = 1 / m02; dgt[1] = -m11 / m02^2
-            dR     = J(1, 10, 0); dR[3]  = 1 / m02; dR[1]  = -m20 / m02^2
-            gs     = -((-3 * sce^2 + 1) * dgt + sce * dR) / dFdg
-            se_sce = _fiv_se(gs, Vm, n)
-        }
-    }
-
-    se_rre = .
-    if (rre < . & m11 != 0) {
-        gr    = J(1, 10, 0)
-        gr[3] = 1 / (2 * m11)
-        gr[2] = -m20 / (2 * m11^2)
-        se_rre = _fiv_se(gr, Vm, n)
-    }
-
+    /* d/dr of sign(r)|r|^(1/3)/2 is |r|^(-2/3)/6 on either side of zero */
     se_hme = .
     if (hme < . & m03 != 0) {
-        rr = m30 / m03
-        if (rr > 0) {
-            cc2    = (1 / 6) * rr^(-2 / 3)
-            gh     = J(1, 10, 0)
-            gh[7]  = cc2 / m03
-            gh[4]  = -cc2 * m30 / m03^2
-            se_hme = _fiv_se(gh, Vm, n)
-        }
+        rr     = m30 / m03
+        cc2    = (1 / 6) * abs(rr)^(-2 / 3)
+        gh     = J(1, 10, 0)
+        gh[7]  = cc2 / m03
+        gh[4]  = -cc2 * m30 / m03^2
+        se_hme = _fiv_se(gh, Vm, n)
     }
 
     /* ---- V and the gradients, for freeivtest ---------------------------- */
     st_matrix("__freeiv_V", Vm)
-    st_matrix("__freeiv_G", (gv \ gv / 2 \ gq \ gs \ gr \ gh \ gv2))
+    st_matrix("__freeiv_G", (gv \ gv / 2 \ gq \ gh \ gv2))
     cn = ("m02", "m11", "m20", "m03", "m12", "m21", "m30", "m04", "m13", "m22")
     st_matrixcolstripe("__freeiv_V", (J(10, 1, ""), cn'))
     st_matrixrowstripe("__freeiv_V", (J(10, 1, ""), cn'))
     st_matrixcolstripe("__freeiv_G", (J(10, 1, ""), cn'))
-    cn = ("ols", "lo", "qme", "sce", "rre", "hme", "vertex")
-    st_matrixrowstripe("__freeiv_G", (J(7, 1, ""), cn'))
+    cn = ("ols", "lo", "qme", "hme", "vertex")
+    st_matrixrowstripe("__freeiv_G", (J(5, 1, ""), cn'))
 
     st_matrix("__freeiv_M",
         (n, sw, m02, m11, m20, m03, m12, m21, m30, m04, m13, m22,
          m02c, m11c, m20c, gt, sk2, lo, hi,
          D, Dse, Dz, vertex, rst, r1, r2, nin,
-         qme, sce, rre, hme, olsg, qbe, qR, qq1, qsk, qek, nsub, clip, dom,
-         theta, sV2, sV1, kk, kst, AA, BB, muu,
-         se_gt, se_lo, se_qme, se_sce, se_rre, se_hme, se_ver))
+         qme, hme, olsg,
+         theta, sV2, sV1, csh, AA, BB, muu, atv,
+         se_gt, se_lo, se_qme, se_hme, se_ver))
     cn = ("n", "sum_w", "m02", "m11", "m20", "m03", "m12", "m21", "m30",
           "m04", "m13", "m22", "m02c", "m11c", "m20c", "gt", "skew2",
           "lo", "hi", "disc", "disc_se", "disc_z", "vertex", "rstar",
-          "root1", "root2", "nroots", "qme", "sce", "rre", "hme", "ols",
-          "qbe", "qbe_R", "qbe_q1", "qbe_skew", "qbe_exk",
-          "qbe_nsub", "qbe_clip", "qbe_dom",
-          "theta", "sV2", "sV1", "k", "kstar", "A", "B", "mu",
-          "se_gt", "se_lo", "se_qme", "se_sce", "se_rre", "se_hme",
-          "se_vertex")
+          "root1", "root2", "nroots", "qme", "hme", "ols",
+          "theta", "sV2", "sV1", "cshare", "A", "B", "mu", "at_vertex",
+          "se_gt", "se_lo", "se_qme", "se_hme", "se_vertex")
     st_matrixcolstripe("__freeiv_M", (J(cols(cn), 1, ""), cn'))
 }
 
@@ -475,7 +536,7 @@ void _freeiv_proxy(string scalar y1v, string scalar y2v, string scalar y3v,
     C = J(3, 3, .)
     if (o[11] == 0) {
         Pinf = _fivp_infl(e2, e3, xi, X, w, mv)
-        Vm   = quadcross(Pinf, w, Pinf) / sw
+        Vm   = _fiv_cov(Pinf, w)
         Jc   = J(3, 8, .)
         for (j = 1; j <= 8; j++) {
             step = 1e-6 * max((abs(mv[j]), 1))
@@ -596,13 +657,13 @@ real scalar _fivl_r2(real colvector y, real matrix Z, real colvector w)
 }
 
 void _freeiv_lit(string scalar y1v, string scalar y2v, string scalar xv,
-                 string scalar wv, string scalar tousev, real scalar gsce,
+                 string scalar wv, string scalar tousev,
                  real scalar delta, real scalar rmaxin)
 {
-    real colvector y1, y2, w, e2, xi, e1h, tau, ctrl, iv, b
+    real colvector y1, y2, w, e2, xi, ctrl, b
     real matrix    X, Xm, Zc, Zf, Xc
-    real scalar    n, sw, k, olsg, lew, cop, rnkg, rp, apeg, aroute, ath
-    real scalar    ost, b0, b1, R0, R1, rmax, cc, vt
+    real scalar    n, sw, olsg, lew, cop, rnkg
+    real scalar    ost, b0, b1, R0, R1, rmax
     string rowvector cn
 
     y1 = st_data(., y1v, tousev)
@@ -646,30 +707,6 @@ void _freeiv_lit(string scalar y1v, string scalar y2v, string scalar xv,
         rnkg = b[rows(b) - 1, 1]
     }
 
-    /* ---- RPIV (TN003) -- proven inconsistent, kept for the table ------- */
-    rp = .
-    if (cols(X) > 0) {
-        e1h = _fiv_resid(y1, (Xm, y2), w)
-        tau = _fiv_resid(e1h, (J(n, 1, 1), xi), w)
-        vt  = quadsum(w :* (tau :- quadsum(w :* tau) / sw):^2) / (sw - 1)
-        cc  = quadsum(w :* (e2 :- quadsum(w :* e2) / sw) :*
-                          (tau :- quadsum(w :* tau) / sw)) / (sw - 1)
-        iv  = e2 + (vt != 0 ? cc / vt : 0) * tau
-        rp  = _fivl_2sls(y1, y2, Xm, iv, w)
-    }
-
-    /* ---- APE (TN003): switch to RPIV when the OLS-SCE gap is large ----- */
-    apeg   = olsg
-    aroute = 0
-    ath    = .
-    if (gsce < . & gsce > 0) {
-        ath = (olsg - gsce) / gsce
-        if (ath > 0.25 & rp < .) {
-            apeg   = rp
-            aroute = 1
-        }
-    }
-
     /* ---- Oster (2019): coefficient stability --------------------------- */
     ost = .; b0 = .; b1 = .; R0 = .; R1 = .; rmax = .
     if (cols(X) > 0) {
@@ -684,11 +721,9 @@ void _freeiv_lit(string scalar y1v, string scalar y2v, string scalar xv,
     }
 
     st_matrix("__freeiv_L",
-        (n, olsg, lew, cop, rnkg, rp, apeg, aroute, ath,
-         ost, b0, b1, R0, R1, rmax, delta))
-    cn = ("n", "ols", "lewbel12", "copula", "rank", "rpiv", "ape",
-          "ape_route", "ape_theta", "oster", "ost_b0", "ost_b1",
-          "ost_R0", "ost_R1", "ost_rmax", "ost_delta")
+        (n, olsg, lew, cop, rnkg, ost, b0, b1, R0, R1, rmax, delta))
+    cn = ("n", "ols", "lewbel12", "copula", "rank", "oster", "ost_b0",
+          "ost_b1", "ost_R0", "ost_R1", "ost_rmax", "ost_delta")
     st_matrixcolstripe("__freeiv_L", (J(cols(cn), 1, ""), cn'))
 }
 
@@ -863,16 +898,25 @@ void _freeiv_gmm(string scalar y1v, string scalar y2v, string scalar xv,
     }
 
     Pinf = _fiv_infl(xi, e2, X, w, mv)
-    Vm   = quadcross(Pinf, w, Pinf) / sw
+    Vm   = _fiv_cov(Pinf, w)
 
     /* textbook two step: identity weight, then the efficient weight built
-       at the step-one estimates, with J evaluated under that same weight  */
-    W = I(4)
-    r = J(1, 4, .)
-    g = _fivg_search(mv, lo, hi, W)
-    o = _fivg_conc(mv, g, W, r)
-    A4 = o[1]
-    B4 = o[2]
+       at the step-one estimates, with J evaluated under that same weight.
+       A design whose variance is missing -- a stratum with a single PSU
+       under singleunit(missing) -- leaves that weight undefined: the GMM
+       then has no estimate, and returns missing values rather than a
+       point no criterion could rank.                                      */
+    W  = I(4)
+    r  = J(1, 4, .)
+    g  = .
+    A4 = .
+    B4 = .
+    if (!hasmissing(Vm)) {
+        g = _fivg_search(mv, lo, hi, W)
+        o = _fivg_conc(mv, g, W, r)
+        A4 = o[1]
+        B4 = o[2]
+    }
     Jm = J(4, 10, 0)
     if (A4 < .) {
         for (s = 1; s <= 10; s++) {
@@ -944,9 +988,10 @@ void _freeiv_gmm(string scalar y1v, string scalar y2v, string scalar xv,
          th, sV2, sV1, A, mv[4] - A, A4, B4, fac, sefac, zfac,
          (Vp[2,2] > 0 ? sqrt(Vp[2,2]) : .),
          (Vp[3,3] > 0 ? sqrt(Vp[3,3]) : .), lo, hi))
-    cn = ("n", "g_gmm", "se_gmm", "J", "p_J", "df_J", "g_theta", "g_sV2",
-          "g_sV1", "g_A", "g_B", "A4", "B4", "idfac", "se_idfac",
-          "z_idfac", "se_A4", "se_B4",
+    cn = ("n", "g_pgmm", "se_pgmm", "J_pgmm", "p_pgmm", "df_pgmm",
+          "pgmm_theta", "pgmm_sV2", "pgmm_sV1", "pgmm_A", "pgmm_B",
+          "pgmm_A4", "pgmm_B4", "idfac", "se_idfac",
+          "z_idfac", "se_pgmm_A4", "se_pgmm_B4",
           "g_lo", "g_hi")
     st_matrixcolstripe("__freeiv_G4", (J(cols(cn), 1, ""), cn'))
 }
@@ -1179,7 +1224,7 @@ void _freeiv_lsz(string scalar y1v, string scalar y2v, string scalar xv,
     segam = .
     Hc = _fivz_h(p, Wv, Yv, Xm) :/ sc'
     Hc = Hc :- (quadcross(w, Hc) / sw)
-    Om = quadcross(Hc, w, Hc) / sw
+    Om = _fiv_cov(Hc, w)
     if (!hasmissing(Gm)) {
         Vp = invsym(Gm' * invsym(Om + 1e-14 * I(npar)) * Gm) / n
         if (Vp[1, 1] > 0) {
@@ -1282,7 +1327,7 @@ void _freeiv_ptests(string scalar y1v, string scalar y2v, string scalar y3v,
     P  = P - (Xm :* e3) * (Qi * (quadcross(D, w, Xm) / sw)')
     D  = (z, z, z, e2, e3, z, z, e2:*e3, e2:^2, e3:^2, 2*xi:*e2, 2*xi:*e3)
     P  = P - (Xm :* xi) * (Qi * (quadcross(D, w, Xm) / sw)')
-    Vm = quadcross(P, w, P) / sw
+    Vm = _fiv_cov(P, w)
 
     sc  = _fivt_sc(mv)
     ofv = _fivt_of(mv)
@@ -1482,7 +1527,12 @@ void _freeiv_gmm16(string scalar y1v, string scalar y2v, string scalar y3v,
     H  = _fivq_h16(e2, e3, xi)
     mv = (quadcross(w, H) / sw)'
     Hc = H :- mv'
-    S  = quadcross(Hc, w, Hc) / (sw - 1) + 1e-12 * I(16)
+    /* the sample covariance (sw - 1), or the design-based one under
+       pweights or vce(svy)                                          */
+    if (findexternal("__fiv_vdesign") == NULL)
+        S = quadcross(Hc, w, Hc) / (sw - 1) + 1e-12 * I(16)
+    else
+        S = _fiv_cov(Hc, w) + 1e-12 * I(16)
 
     /* start: the closed form of Theorem 1 */
     o = _fivp_cf((_fiv_m(e2:^2, w, sw), _fiv_m(e3:^2, w, sw),
@@ -1494,7 +1544,9 @@ void _freeiv_gmm16(string scalar y1v, string scalar y2v, string scalar y3v,
           "q_s1", "q_s2", "q_s3", "q_k1", "q_k2", "q_k3",
           "q_se_g2", "q_se_g3", "q_se_a1", "q_se_a2", "q_se_a3", "q_se_mu3",
           "q_se_s1", "q_se_s2", "q_se_s3", "q_se_k1", "q_se_k2", "q_se_k3")
-    if (o[11] != 0) {
+    /* no closed form to start from, or a design whose variance is missing
+       (a stratum with a single PSU): no weight, no GMM */
+    if (o[11] != 0 | hasmissing(S)) {
         st_matrix("__freeiv_Q16", (n, J(1, 29, .)))
         st_matrixcolstripe("__freeiv_Q16", (J(cols(cn), 1, ""), cn'))
         return
@@ -1834,24 +1886,24 @@ void _fivj_post(real scalar n, real scalar g, real scalar se, real scalar JJ,
     st_matrix("__freeiv_G9", r)
     cn = J(1, 21, "")
     cn[1]  = "n"
-    cn[2]  = "g_jgmm"
-    cn[3]  = "se_jgmm"
-    cn[4]  = "J9"
-    cn[5]  = "p_J9"
-    cn[6]  = "df_J9"
-    cn[7]  = "j_theta"
-    cn[8]  = "j_sV2"
-    cn[9]  = "j_sV1"
-    cn[10] = "j_A"
-    cn[11] = "j_B"
-    cn[12] = "j_A4"
-    cn[13] = "j_B4"
-    cn[14] = "j_kurt"
+    cn[2]  = "g_gmm"
+    cn[3]  = "se_gmm"
+    cn[4]  = "J_gmm"
+    cn[5]  = "p_gmm"
+    cn[6]  = "df_gmm"
+    cn[7]  = "gmm_theta"
+    cn[8]  = "gmm_sV2"
+    cn[9]  = "gmm_sV1"
+    cn[10] = "gmm_A"
+    cn[11] = "gmm_B"
+    cn[12] = "gmm_A4"
+    cn[13] = "gmm_B4"
+    cn[14] = "gmm_kurt"
     cn[15] = "ar_lo"
     cn[16] = "ar_hi"
     cn[17] = "ar_frac"
-    cn[18] = "j_weak"
-    cn[19] = "j_bound"
+    cn[18] = "gmm_weak"
+    cn[19] = "gmm_bound"
     cn[20] = "g_lo"
     cn[21] = "g_hi"
     st_matrixcolstripe("__freeiv_G9", (J(21, 1, ""), cn'))
@@ -1866,6 +1918,7 @@ void _freeiv_jgmm(string scalar y1v, string scalar y2v, string scalar xv,
     real scalar    n, sw, gt, lo, hi, tlo, thi, eps, cc
     real scalar    g, th, JJ, i, j, bv, v, Jmin, ng, nt, arlo, arhi
     real scalar    se, kurt, weak, bnd
+    real scalar    k, gg, ls, hs, st, bj, c0, wd, bc, tt
 
     y1 = st_data(., y1v, tousev)
     y2 = st_data(., y2v, tousev)
@@ -1903,7 +1956,15 @@ void _freeiv_jgmm(string scalar y1v, string scalar y2v, string scalar xv,
     /* influence-function variance of the nine moments */
     Pinf = _fiv_infl(xi, e2, X, w, mv)
     Pinf = Pinf[., (1, 2, 3, 4, 5, 6, 8, 9, 10)]
-    Vm   = quadcross(Pinf, w, Pinf) / sw
+    Vm   = _fiv_cov(Pinf, w)
+
+    /* a design whose variance is missing (a stratum with a single PSU under
+       singleunit(missing)) leaves the weight matrix undefined: no estimate,
+       missing values rather than the first point of a grid nothing ranks */
+    if (hasmissing(Vm)) {
+        _fivj_post(n, ., ., ., ., J(8, 1, .), ., ., ., ., ., ., lo, hi)
+        return
+    }
 
     bl = (0.001 \ 0.001 \ -1000 \ -1000 \ 0.001 \ 0.001)
     bu = (100 * q[3] \ 100 * q[1] \ 1000 \ 1000 \ 10000 \ 10000)
@@ -1933,9 +1994,10 @@ void _freeiv_jgmm(string scalar y1v, string scalar y2v, string scalar xv,
     if (abs(g - hi)  < 1e-5 * max((abs(hi), 1))) bnd = 1
     if (abs(th - tlo) < 1e-9)                    bnd = 1
 
-    /* the Anderson-Rubin region: profile J over gamma, keep the values
-       within 3.84 of the minimum.  Valid on the boundary, where neither
-       the standard error nor the chi2(1) law for J is.                 */
+    /* the profile-J region: profile J over gamma, keep the values within
+       3.84 of the minimum.  It rests on no standard error, which the
+       boundary leaves undefined, and its share of the interval shows how
+       flat the criterion is.                                            */
     arlo = .
     arhi = .
     if (doar == 0) {
@@ -1943,26 +2005,64 @@ void _freeiv_jgmm(string scalar y1v, string scalar y2v, string scalar xv,
                    lo, hi)
         return
     }
+    /* 1.0.0: the profile at each gamma was the minimum over a grid of 120
+       values of log theta, about 15% apart, with no refinement, while the
+       point is refined.  Where the criterion is flat that is enough; where
+       it is steep (large n, strong identification) the grid overstated the
+       profile unevenly, and the region came out narrower than the standard
+       error says and could miss the estimate itself (n = 100,000: gamma
+       0.4007 outside [0.4014, 0.4048]).  Now each gamma refines log theta
+       as the point does, four passes of ten steps, each window a fifth of
+       the last, the minimum is the J of the estimate when that is lower,
+       and the estimate belongs to its own region.                         */
     ng = 241
     nt = 120
     prof = J(ng, 1, .)
+    ls = log(tlo)
+    hs = log(thi)
+    st = (hs - ls) / (nt - 1)
     for (i = 1; i <= ng; i++) {
+        gg = lo + (hi - lo) * (i - 1) / (ng - 1)
         bv = 1e300
+        bj = 1
         for (j = 1; j <= nt; j++) {
-            v = _fivj_at(q, lo + (hi - lo) * (i - 1) / (ng - 1),
-                         exp(log(tlo) + (log(thi) - log(tlo)) * (j - 1) / (nt - 1)),
-                         W, bl, bu, p6)
-            if (v < bv) bv = v
+            v = _fivj_at(q, gg, exp(ls + st * (j - 1)), W, bl, bu, p6)
+            if (v < bv) {
+                bv = v
+                bj = j
+            }
+        }
+        c0 = ls + st * (bj - 1)
+        wd = st
+        for (k = 1; k <= 4; k++) {
+            bc = c0
+            for (j = -5; j <= 5; j++) {
+                if (j == 0) continue
+                tt = c0 + wd * j / 5
+                if (tt < ls | tt > hs) continue
+                v = _fivj_at(q, gg, exp(tt), W, bl, bu, p6)
+                if (v < bv) {
+                    bv = v
+                    bc = tt
+                }
+            }
+            c0 = bc
+            wd = wd / 5
         }
         prof[i] = n * bv
     }
     Jmin = min(prof)
+    if (JJ < Jmin) Jmin = JJ
     for (i = 1; i <= ng; i++) {
         if (prof[i] - Jmin <= 3.841459) {
             v = lo + (hi - lo) * (i - 1) / (ng - 1)
             if (arlo >= .) arlo = v
             arhi = v
         }
+    }
+    if (JJ - Jmin <= 3.841459) {
+        if (arlo >= . | g < arlo) arlo = g
+        if (arhi >= . | g > arhi) arhi = g
     }
 
     _fivj_post(n, g, se, JJ, th, pp, kurt, arlo, arhi,

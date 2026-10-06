@@ -1,15 +1,15 @@
-*! freeiv_engine 0.2.0  14sep2026  A. Araar
+*! freeiv_engine 1.0.0  06oct2026  A. Araar
 *! Loader of the Mata engine.  An ado-file loaded automatically does not
 *! execute its mata: block, so freeiv_mata.ado is run on demand, once.
 *!
-*! 0.2.0 checks EVERY entry point, not just the first.  Guarding on
-*! _freeiv_all() alone was wrong in one ordinary case: a session that had
-*! already used an older freeiv still holds that older engine in memory, the
-*! guard reports it as loaded, and a newly added function -- _freeiv_jgmm()
-*! in 0.8.0 -- is never defined.  The user then meets "_freeiv_jgmm() not
-*! found" with no hint that the cure is to reload.  Naming all of them makes
-*! an upgrade inside a live session reload, which is what the guard was for.
-*! A new brick adds its entry point to the list below.
+*! Every entry point is checked, not just the first: a session that has
+*! already used an older freeiv still holds that older engine in memory, and
+*! a function added since would never be defined.  When one is missing, the
+*! engine in memory is dropped before freeiv_mata.ado runs again -- Mata
+*! refuses to redefine a function that exists, and 1.0.0 changes the
+*! arguments of _freeiv_all() and _freeiv_lit(), so an upgrade inside a live
+*! session must replace the whole engine, not complete it.  A new brick adds
+*! its entry point to the list below.
 
 cap program drop _freeiv_engine_ck
 cap program drop freeiv_engine
@@ -31,6 +31,7 @@ program define freeiv_engine
     version 16
     local need "_freeiv_all _freeiv_proxy _freeiv_lit _freeiv_gmm"
     local need "`need' _freeiv_jgmm _freeiv_lsz _freeiv_ptests _freeiv_gmm16"
+    local need "`need' _fiv_vset _fiv_vclear _fiv_vinfo _fiv_cov"
 
     _freeiv_engine_ck "`need'"
     if ("`s(fiv_missing)'" == "") exit
@@ -44,6 +45,9 @@ program define freeiv_engine
         exit 601
     }
     local fn "`r(fn)'"
+    * every function of the engine is named _fiv*() or _freeiv*()
+    cap mata: mata drop _fiv*()
+    cap mata: mata drop _freeiv*()
     cap noisily version `c(stata_version)': run "`fn'"
 
     _freeiv_engine_ck "`need'"

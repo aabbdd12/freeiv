@@ -1,8 +1,9 @@
-*! freeivtest 0.1.0  13sep2026  A. Araar (Universite Laval / PEP)
+*! freeivtest 1.0.0  06oct2026  A. Araar (Universite Laval / PEP)
 *! A direct test of endogeneity, agreement tests between the instrument-free
 *! routes, and the confrontation of an outside estimate with the identified set.
+*! After the two-indicator model, the three tests that model carries.
 *!
-*!   freeivtest [, GAMma(#) SEGamma(#) Level(#) ]
+*!   freeivtest [, GAMma(#) SEGamma(#) ]
 *!
 *! FIRST BLOCK -- theta = 0, with no estimate of gamma.  Under theta = 0 the
 *! OLS residual r = xi - gt eps2 is INDEPENDENT of eps2, not merely
@@ -31,12 +32,11 @@
 *! the assumption that separates the two routes:
 *!
 *!   qme - ols   theta = 0        no confounding at all
-*!   qme - rre   k* = 1           scale-free equal-variance restriction
-*!   qme - sce   k  = 1           the same, in the units of the data
 *!   qme - hme   B  = 0           symmetry of V2
 *!
-*! The QME is the reference because it is the route with the weakest
-*! assumptions: scale consistency plus E[U^3] != 0, and nothing else.
+*! (the vertex replaces the qme when the discriminant is negative).  The QME
+*! is the reference because it is the route with the weakest assumptions:
+*! scale consistency plus E[U^3] != 0, and nothing else.
 *!
 *! NOTE ON WHAT IS NOT TESTED HERE.  None of these pairs tests scale
 *! consistency itself.  The map gamma -> (theta, sigma2_V1, sigma2_V2) is
@@ -52,27 +52,47 @@
 *! freely and it can be compared with g2 a2 + g3 a3, and by confronting the
 *! identified set with a route that does not impose it -- LSZ, Lewbel (2012),
 *! or a genuine instrument.  That last test is what gamma(#) performs.
+*!
+*! Under vce(svy) the covariance is the design's, the z become t on the
+*! design degrees of freedom d, and the Wald becomes the adjusted
+*! F = (d - 1) W / (2 d) on (2, d - 1) degrees of freedom, as svy reports it.
 
 cap program drop freeivtest
 cap program drop _fivt_pair
+cap program drop _fivt_proxy
 
 program define freeivtest, rclass
     version 16
-    syntax [, GAMma(real -99999) SEGamma(real -1) Level(cilevel) ]
+    syntax [, GAMma(real -99999) SEGamma(real -1) ]
 
     if ("`e(cmd)'" != "freeiv") {
         di as err "freeivtest is used after freeiv"
         exit 301
     }
+    if ("`e(model)'" == "B") {
+        if (`gamma' != -99999 | `segamma' != -1) {
+            di as err "gamma() and segamma() confront an outside estimate with the"
+            di as err "    bounds of the one-endogenous model; they do not apply"
+            di as err "    after the two-indicator model"
+            exit 198
+        }
+        _fivt_proxy
+        return add
+        exit
+    }
     cap confirm matrix e(grad)
     if (_rc) {
-        di as err "e(grad) not found: re-run freeiv with version 0.4.0 or later"
+        di as err "e(grad) not found: re-run freeiv"
         exit 498
     }
 
+    * t on the design degrees of freedom under vce(svy), the normal otherwise
+    local dfr = e(df_r)
+    local st = cond(`dfr' < ., "t", "z")
+
     di
     di as txt "freeiv agreement tests" _col(52) "Number of obs = " ///
-       as res %9.0f e(n)
+       as res %9.0f e(N)
 
     * ---- 1. endogeneity itself, with no estimate of gamma ------------------
     tempname VV GG gg SS WW
@@ -105,12 +125,23 @@ program define freeivtest, rclass
         local W  = `WW'[1, 1]
         local pW = chi2tail(2, `W')
     }
+    local F = .
+    if (`dfr' < . & `dfr' > 1 & `W' < .) {
+        local F  = (`dfr' - 1) * `W' / (2 * `dfr')
+        local pW = Ftail(2, `dfr' - 1, `F')
+    }
     di as txt "{hline 76}"
     di as txt "Endogeneity itself: theta = 0, with no estimate of gamma"
     di as txt "    E[r eps2^2] = m12 - gt m03" _col(46) as res %12.6f `g1'
     di as txt "    E[r^2 eps2] = m21 - 2gt m12 + gt^2 m03" _col(46) as res %12.6f `g2'
-    di as txt "    Wald, chi2(2)" _col(46) as res %12.4f `W' ///
-       as txt "   P>chi2 " as res %6.4f `pW'
+    if (`F' < .) {
+        di as txt "    adjusted Wald, F(2, " `dfr' - 1 ")" _col(46) as res %12.4f `F' ///
+           as txt "   P>F " as res %6.4f `pW'
+    }
+    else {
+        di as txt "    Wald, chi2(2)" _col(46) as res %12.4f `W' ///
+           as txt "   P>chi2 " as res %6.4f `pW'
+    }
     di as txt "    r is the OLS residual of xi on eps2.  Under theta = 0 it is"
     di as txt "    independent of eps2, not merely uncorrelated, so both cross"
     di as txt "    moments vanish.  This never estimates gamma, so it keeps its"
@@ -124,26 +155,29 @@ program define freeivtest, rclass
     di as txt "    A = alpha2^3 E[U^3] != 0, a skewed confounder.  The two signals"
     di as txt "    are different, so detection can succeed where estimation fails."
 
+    * the reference: the qme, or the vertex when the discriminant is negative
+    local ref = cond(e(at_vertex) == 1, "vertex", "qme")
     di as txt "{hline 76}"
-    di as txt "Pairwise agreement between the closed forms (reference: qme)"
+    di as txt "Pairwise agreement between the closed forms (reference: `ref')"
     di as txt "  " %-12s "pair" _col(18) %11s "difference" _col(31) %10s "s.e." ///
-       _col(43) %8s "z" _col(53) %7s "P>|z|" "   tests"
+       _col(43) %8s "`st'" _col(53) %7s "P>|`st'|" "   tests"
     di as txt "{hline 76}"
 
-    _fivt_pair qme ols "theta = 0  (no confounding)"
+    _fivt_pair `ref' ols "theta = 0" `dfr'
     local z_ols = r(z)
-    _fivt_pair qme rre "k* = 1     (scale free)"
-    local z_rre = r(z)
-    _fivt_pair qme sce "k  = 1     (unit dependent)"
-    local z_sce = r(z)
-    _fivt_pair qme hme "B  = 0     (symmetry of V2)"
+    _fivt_pair `ref' hme "B = 0" `dfr'
     local z_hme = r(z)
 
     di as txt "{hline 76}"
-    di as txt "A large |z| says the two routes disagree by more than sampling noise,"
-    di as txt "so the assumption that separates them is rejected.  A small |z| is"
-    di as txt "mutual corroboration: two routes with different assumptions agree."
-    di as txt "None of these tests scale consistency -- they all presuppose it."
+    di as txt "theta = 0: no confounding.  B = 0: V2 symmetric, as the hme assumes."
+    di as txt "A large |`st'| says the two routes disagree by more than sampling"
+    di as txt "noise, so the assumption that separates them is rejected.  A small"
+    di as txt "|`st'| is mutual corroboration: two routes with different assumptions"
+    di as txt "agree.  None of these tests scale consistency -- they presuppose it."
+    if (e(at_vertex) == 1) {
+        di as txt "The vertex is not a root: it is where the two roots merge when"
+        di as txt "the discriminant is negative, so its pairs are read as rough."
+    }
 
     * ---- an outside estimate against the identified set --------------------
     local out_z = .
@@ -153,6 +187,11 @@ program define freeivtest, rclass
         local hi = e(hi)
         local selo = e(se_lo)
         local sehi = e(se_gt)
+        * when gamma-tilde < 0 the interval is [gamma-tilde, gamma-tilde/2]
+        if (e(gt) < 0) {
+            local selo = e(se_gt)
+            local sehi = e(se_lo)
+        }
         di as txt "{hline 76}"
         di as txt "Outside estimate " as res %10.6f `gamma' as txt ///
            " against the identified set"
@@ -177,10 +216,12 @@ program define freeivtest, rclass
             local sv = `sb'^2
             if (`segamma' >= 0) local sv = `sv' + `segamma'^2
             local out_z = cond(`sv' > 0, `out_d' / sqrt(`sv'), .)
+            if (`dfr' < .) local pout = 2 * ttail(`dfr', abs(`out_z'))
+            else           local pout = 2 * normal(-abs(`out_z'))
             di as txt "    distance to the `which' bound" _col(46) ///
                as res %12.6f `out_d'
-            di as txt "    z" _col(46) as res %12.4f `out_z' ///
-               as txt "   P>|z| " as res %6.4f 2 * normal(-abs(`out_z'))
+            di as txt "    `st'" _col(46) as res %12.4f `out_z' ///
+               as txt "   P>|`st'| " as res %6.4f `pout'
             di as res "    => outside the set: under scale consistency no value of"
             di as res "    gamma can produce this estimate without a negative"
             di as res "    variance.  Run -freeivdiag, gamma(`gamma')- to see which."
@@ -197,20 +238,20 @@ program define freeivtest, rclass
     di as txt "{hline 76}"
 
     return scalar W_endo = `W'
+    return scalar F_endo = `F'
     return scalar p_endo = `pW'
     return scalar g1     = `g1'
     return scalar g2     = `g2'
-    return scalar z_ols = `z_ols'
-    return scalar z_rre = `z_rre'
-    return scalar z_sce = `z_sce'
-    return scalar z_hme = `z_hme'
-    return scalar out_z = `out_z'
-    return scalar out_d = `out_d'
+    return scalar z_ols  = `z_ols'
+    return scalar z_hme  = `z_hme'
+    return scalar out_z  = `out_z'
+    return scalar out_d  = `out_d'
+    return local  ref    "`ref'"
 end
 
 
 program define _fivt_pair, rclass
-    args A B what
+    args A B what dfr
     local ga = e(`A')
     local gb = e(`B')
     local df = .
@@ -230,7 +271,10 @@ program define _fivt_pair, rclass
                 if (`vd' > 0 & `vd' < .) {
                     local sd = sqrt(`vd')
                     local z  = `df' / `sd'
-                    local p  = 2 * normal(-abs(`z'))
+                    if ("`dfr'" != "" & "`dfr'" != ".") {
+                        local p = 2 * ttail(`dfr', abs(`z'))
+                    }
+                    else local p = 2 * normal(-abs(`z'))
                 }
             }
         }
@@ -242,4 +286,70 @@ program define _fivt_pair, rclass
     return scalar se   = `sd'
     return scalar z    = `z'
     return scalar p    = `p'
+end
+
+
+* after the two-indicator model: the three tests it carries, which model A
+* cannot perform, gathered from e()
+program define _fivt_proxy, rclass
+    local dfr = e(df_r)
+    local st = cond(`dfr' < ., "t", "z")
+    di
+    di as txt "freeiv tests, two indicators" _col(52) "Number of obs = " ///
+       as res %9.0f e(N)
+    di as txt "{hline 76}"
+    if (e(guard) != 0) {
+        di as res "no tests: guard " %1.0f e(guard) " of Proposition 1 fired, so the"
+        di as res "two-indicator model has no estimate on these data (see freeiv)"
+        di as txt "{hline 76}"
+        exit
+    }
+    di as txt "  " %-26s "test" _col(30) %10s "statistic" _col(42) %10s "s.e." ///
+       _col(54) %7s "`st'" _col(63) %7s "P>|`st'|"
+    di as txt "{hline 76}"
+    foreach k in sc of {
+        if ("`k'" == "sc") {
+            local lab "scale consistency"
+            local d = e(sc_d)
+            local s = e(se_sc)
+            local z = e(z_sc)
+        }
+        else {
+            local lab "one factor, R1 - R3"
+            local d = e(of_d)
+            local s = e(se_of)
+            local z = e(z_of)
+        }
+        local p = .
+        if (`z' < .) {
+            if (`dfr' < .) local p = 2 * ttail(`dfr', abs(`z'))
+            else           local p = 2 * normal(-abs(`z'))
+        }
+        di as txt "  " %-26s "`lab'" _col(30) as res %10.6f `d' _col(42) ///
+           %10.6f `s' _col(54) %7.3f `z' _col(63) %7.4f `p'
+        local p_`k' = `p'
+    }
+    di as txt "  " %-26s "J of the GMM, chi2(4)" _col(30) as res %10.4f e(q_J) ///
+       _col(63) %7.4f e(q_pJ)
+    di as txt "{hline 76}"
+    di as txt "scale consistency: a1 against g2 a2 + g3 a3, the restriction model A"
+    di as txt "    imposes and cannot test.  A rejection says the single-indicator"
+    di as txt "    route would not be valid on these data."
+    di as txt "one factor: R1 equals a2/a3 under one factor; R3 needs symmetric V2"
+    di as txt "    and V3 as well, so a rejection is against one factor AND that"
+    di as txt "    symmetry, jointly."
+    local weak3 = (abs(e(z_m223)) < 2 | abs(e(z_m233)) < 2 | e(z_m223) >= . | e(z_m233) >= .)
+    if (`weak3') {
+        di as res "    The third-order cross-moments are not both measured (z < 2),"
+        di as res "    so the one-factor test has little power here."
+    }
+    di as txt "J: the eight moments the closed form leaves out, against the"
+    di as txt "    one-factor linear structure itself."
+    di as txt "{hline 76}"
+    return scalar z_sc = e(z_sc)
+    return scalar p_sc = `p_sc'
+    return scalar z_of = e(z_of)
+    return scalar p_of = `p_of'
+    return scalar J    = e(q_J)
+    return scalar p_J  = e(q_pJ)
 end

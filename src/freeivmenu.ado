@@ -1,12 +1,16 @@
-*! freeivmenu 0.4.1  15sep2026  A. Araar (Universite Laval / PEP)
+*! freeivmenu 1.0.0  06oct2026  A. Araar (Universite Laval / PEP)
 *! The identification menu: before any estimation, what these data can carry.
 *! One line per family of strategies, with the signal it needs, its value, and
 *! a verdict.
 *!
-*!   freeivmenu depvar [indepvars] (endogvar) [if] [in] [fw pw aw]
-*!              [, QUANtile(#) BW(#) ]
-*!   freeivmenu depvar [indepvars] (endogvar1 endogvar2) [if] [in] [fw pw aw]
+*!   freeivmenu depvar [indepvars] (endogvar) [if] [in] [pw aw] [, BW(#) ]
+*!   freeivmenu depvar [indepvars] (endogvar1 endogvar2) [if] [in] [pw aw]
 *!              [, BW(#) ]
+*!
+*! 1.0.0 follows freeiv 1.0.0: the lines of the equal-variance routes (rre,
+*! sce) and quantile() are gone with them, fweights are removed, and the
+*! third moments A, B and mu are read at the qme -- or at the vertex when
+*! the discriminant is negative, which the menu then says.
 *!
 *! 0.4.0 adds the menu of the two-indicator model (two variables in the
 *! parentheses): relevance of the pair, the two third-order cross-moments
@@ -34,8 +38,7 @@ cap program drop _fivm_profile
 
 program define freeivmenu, rclass
     version 16
-    syntax anything(name=eqs equalok) [if] [in] [fw pw aw] ///
-        [, QUANtile(real 0.25) BW(real -1) ]
+    syntax anything(name=eqs equalok) [if] [in] [pw aw] [, BW(real -1) ]
 
     local p1 = strpos("`eqs'", "(")
     local p2 = strpos("`eqs'", ")")
@@ -80,6 +83,11 @@ program define freeivmenu, rclass
     qui count if `touse'
     local N = r(N)
 
+    * the covariance of the moment contributions, as in freeiv: in sandwich
+    * form with pweights, so that the z of the discriminant is freeiv's
+    cap mata: _fiv_vclear()
+    if ("`weight'" == "pweight") mata: _fiv_vset("", "", "", "`touse'", 0)
+
     tempvar wv xi e2 e2sq
     if ("`weight'" != "") {
         qui gen double `wv' `exp' if `touse'
@@ -99,12 +107,15 @@ program define freeivmenu, rclass
     if (`nend' == 2) {
         gettoken en2 en3 : endog
         local en3 = trim("`en3'")
-        mata: _freeiv_proxy("`depvar'", "`en2'", "`en3'", "`exog'", ///
-                            "`wname'", "`touse'")
+        cap noisily mata: _freeiv_proxy("`depvar'", "`en2'", "`en3'", ///
+                                        "`exog'", "`wname'", "`touse'")
+        local rc = _rc
+        cap mata: _fiv_vclear()
+        if (`rc') exit `rc'
         tempname PB
         matrix `PB' = __freeiv_P
         cap matrix drop __freeiv_P __freeiv_PV
-        local pvals "n sum_w m22 m33 m23 mx2 mx3 m223 m233 mx23 g2 g3 a1 a2 a3 mu3 s2 s3 cnum sc guard se_g2 se_g3 se_a1 R1 R2 R3 disc_R ivgap t_rho"
+        local pvals : colnames `PB'
         local j = 0
         foreach v of local pvals {
             local ++j
@@ -289,13 +300,16 @@ program define freeivmenu, rclass
 
     qui gen double `xi' = .
     qui gen double `e2' = .
-    mata: _freeiv_all("`depvar'", "`endog'", "`exog'", "`wname'", "`touse'", ///
-                      `quantile', "`xi'", "`e2'")
+    cap noisily mata: _freeiv_all("`depvar'", "`endog'", "`exog'", ///
+                                  "`wname'", "`touse'", "`xi'", "`e2'")
+    local rc = _rc
+    cap mata: _fiv_vclear()
+    if (`rc') exit `rc'
     tempname M
     matrix `M' = __freeiv_M
     matrix drop __freeiv_M
     cap matrix drop __freeiv_V __freeiv_G
-    local vals "n sum_w m02 m11 m20 m03 m12 m21 m30 m04 m13 m22 m02c m11c m20c gt skew2 lo hi disc disc_se disc_z vertex rstar root1 root2 nroots qme sce rre hme ols qbe qbe_R qbe_q1 qbe_skew qbe_exk qbe_nsub qbe_clip qbe_dom theta sV2 sV1 k kstar A B mu se_gt se_lo se_qme se_sce se_rre se_hme se_vertex"
+    local vals : colnames `M'
     local j = 0
     foreach v of local vals {
         local ++j
@@ -354,49 +368,52 @@ program define freeivmenu, rclass
     if (`disc' < .) {
         _fivm_verdict `disc_z' 2 1
         local v2 "`s'"
+        * D = gamma^2 (2A - B)^2 cannot be negative under the model: far
+        * below zero it is not a strong signal but a refutation
+        if (`disc_z' <= -2) local v2 "REFUTES"
         di as txt %-22s "" %-28s "z of the discriminant D" ///
            as res %10.2f `disc_z' as txt "  `v2'"
+        if (`disc_z' <= -2) {
+            di as txt %-22s "" "  D < 0 beyond its noise: no one-factor model gives it"
+        }
     }
     if (`disc' < 0) {
         di as txt %-22s "" %-28s "D < 0: the roots merge" ///
            as res %10s "." as txt "  vertex used"
     }
-    if (`se_qme' < .) {
+    * a precise qme outside the bounds is not usable: say that first
+    if (`disc' >= 0 & `disc' < . & `nroots' == 0) {
+        di as txt %-22s "" %-28s "roots inside the bounds" ///
+           as res %10.0f `nroots' as txt "  NONE"
+        di as txt %-22s "" "  no root is compatible with scale consistency"
+    }
+    else if (`se_qme' < .) {
         di as txt %-22s "" %-28s "implied s.e. of the QME" ///
            as res %10.4f `se_qme' as txt cond(`se_qme' > `w' / 4, ///
            "  wide", "  usable")
     }
+    * A, B and mu are read at the qme, or at the vertex when the
+    * discriminant is negative -- where B = 2A by construction, so that mu
+    * is then 1/3 whatever the data, and says nothing
     if (`A' < .) {
-        di as txt %-22s "" %-28s "A = alpha2^3 E[U^3]" as res %10.4f `A'
+        di as txt %-22s "" %-28s "A = alpha2^3 E[U^3]" as res %10.4f `A' ///
+           as txt cond(`at_vertex' == 1, "  at the vertex", "")
         di as txt %-22s "" %-28s "mu = A/(A+B)" as res %10.4f `mu' ///
-           as txt cond(abs(`mu' - 1/3) < 0.10, "  near 1/3", "")
+           as txt cond(`at_vertex' == 1, "  1/3 there", ///
+                  cond(abs(`mu' - 1/3) < 0.10, "  near 1/3", ""))
     }
 
-    * 3. equal variances, scale free (RRE) ----------------------------------
-    if (`kstar' < .) {
-        di as txt %-22s "equal variances: rre" %-28s "k* = sV1/(g^2 sV2), sets 1" ///
-           as res %10.4f `kstar' as txt cond(abs(`kstar' - 1) < 0.5, "  plausible", "  doubtful")
-        di as txt %-22s "" %-28s "rre = m20/(2 m11)" as res %10.4f `rre' ///
-           as txt cond(`rre' < `lo' | `rre' > `hi', "  outside", "  inside")
-    }
-    else di as txt %-22s "equal variances: rre" %-28s "k* not identified here" ///
-         as res %10s "." as txt "  undecidable"
-
-    * 4. equal variances, unit dependent (SCE) ------------------------------
-    if (`k' < .) {
-        di as txt %-22s "  and its sce variant" %-28s "k = sV1/sV2, sce sets 1" ///
-           as res %10.4f `k' as txt cond(abs(`k' - 1) < 0.5, "  plausible", "  doubtful")
-        di as txt %-22s "" %-28s "k depends on units; k* not"
-    }
-
-    * 5. symmetry of V2 (HME) ------------------------------------------------
+    * 3. symmetry of V2 (HME) ------------------------------------------------
     if (`B' < .) {
         local rel = cond(`m03' != 0, abs(`B' / `m03'), .)
         di as txt %-22s "symmetry of V2: hme" %-28s "B = E[V2^3], hme sets 0" ///
            as res %10.4f `B' as txt cond(`rel' < 0.2, "  plausible", "  doubtful")
+        if (`at_vertex' == 1) {
+            di as txt %-22s "" "  B read at the vertex, where B = 2A by construction"
+        }
     }
 
-    * 6. heteroskedasticity (Lewbel 2012) ------------------------------------
+    * 4. heteroskedasticity (Lewbel 2012) ------------------------------------
     if (`F_lew' < .) {
         di as txt %-22s "heteroskedasticity:" %-28s "F of eps2^2 on X" ///
            as res %10.2f `F_lew' as txt cond(`p_lew' < 0.05, "  present", "  absent")
@@ -405,7 +422,7 @@ program define freeivmenu, rclass
     else di as txt %-22s "heteroskedasticity:" %-28s "no exogenous control" ///
          as res %10s "." as txt "  unavailable"
 
-    * 7. local slope profile --------------------------------------------------
+    * 5. local slope profile --------------------------------------------------
     di as txt %-22s "local slope profile" %-28s "slope of xi on eps2 at p5" ///
        as res %10.4f `P'[1, 2] as txt "  h = " %5.3f `h'
     di as txt %-22s "  of E[xi | eps2]" %-28s "p10 / p25 / p50" ///
@@ -423,16 +440,15 @@ program define freeivmenu, rclass
     di as txt %-22s "" %-28s "tail ratio p95/p5" as res %10.2f `pratio' ///
        as txt cond(`pratio' < ., cond(abs(`pratio' - 2) < 0.5, "  near 2", "  not 2"), "")
 
-    * 8. proxy ---------------------------------------------------------------
+    * 6. proxy ---------------------------------------------------------------
     di as txt %-22s "two indicators" %-28s "freeivmenu y1 x (y2 y3)" ///
        as res %10s "." as txt "  by syntax"
 
     di as txt "{hline 76}"
     di as txt "Reading: the first line is always true; the others say whether the"
     di as txt "assumption that identifies is carried by the data.  A weak signal does"
-    di as txt "not make an estimator wrong, it makes it imprecise."
-    di as txt "B = 0 and k* = 1 are restrictions on the model; k = 1 is a restriction"
-    di as txt "on the units, which is why the sce is reported below the rre."
+    di as txt "not make an estimator wrong, it makes it imprecise.  B = 0 is a"
+    di as txt "restriction on the model, which the hme adds to the qme's."
     di as txt "The slope profile is flat when the confounder is Gaussian-like; its"
     di as txt "minimum bounds gamma from above when E[U|eps2] is increasing, and the"
     di as txt "tail ratio tends to 2 under scale consistency.  A curved profile is"
