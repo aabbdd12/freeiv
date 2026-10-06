@@ -1,0 +1,72 @@
+v 3
+d 'FREEIV': module for instrument-free estimation of a linear structural model with an endogenous regressor
+d
+d  freeiv estimates the coefficient on an endogenous regressor without an
+d  external instrument, in the linear triangular model in which a single
+d  latent confounder generates the endogeneity. Under scale consistency -- the
+d  confounder moves the outcome directly by exactly as much as it moves it
+d  through the regressor -- the second moments of the data leave one number
+d  free, and the coefficient lies between half the least-squares slope and
+d  that slope: an interval that assumes nothing more and is exactly the set of
+d  values for which the implied variances are non-negative. The routes of the
+d  command impose the same linear structure on the moments of the next orders:
+d  at order three the quadratic moment estimator (the default) and a closed
+d  form for symmetric noise; at order four a joint and a profiled GMM, each
+d  with a Hansen J, and the region where the profiled J stays within 3.84 of
+d  its minimum. A second indicator of the same confounder frees the
+d  confounder's direct loading and turns scale consistency into a test. The
+d  estimators of Lewbel, Schennach and Zhang (2024) and of Lewbel (2012), the
+d  Gaussian copula, the rank control function and the coefficient-stability
+d  adjustment of Oster (2019) are computed on the same data and judged by the
+d  same interval. Standard errors come from the influence functions of the
+d  moments, with pweights in sandwich form and Taylor linearization over a
+d  survey design declared by svyset (vce(svy)). Companion commands report what
+d  the data can carry before any estimation (freeivmenu), what a value of the
+d  coefficient implies about the unobservables (freeivdiag), tests of
+d  endogeneity and of the agreement between routes (freeivtest), and all of it
+d  in one table (freeivreport); a dialog box is included, and the examples of
+d  the help run from clickable links (freeiv_examples). The paper that
+d  documents the models and the command is included as an ancillary file
+d  (freeiv_paper.pdf) and on Zenodo: Araar, A. (2026). freeiv: Instrument-free
+d  estimation of a linear structural model with an endogenous regressor
+d  (Version 1.0.0). Zenodo. https://doi.org/10.5281/zenodo.23190841 (all
+d  versions: https://doi.org/10.5281/zenodo.22770175)
+d
+d KW: endogeneity
+d KW: instrument-free estimation
+d KW: latent confounder
+d KW: higher-order moments
+d KW: partial identification
+d KW: GMM
+d KW: survey design
+d
+d Requires: Stata version 16
+d
+d Distribution-Date: 20261006
+d
+d Author: Abdelkrim Araar, Universite Laval and Partnership for Economic Policy (PEP)
+d Support: email aabd@ecn.ulaval.ca
+d
+d (A copy of the package as submitted to the SSC archive, version 1.0.0, to
+d test it before SSC publishes it: the example data and the paper are
+d ancillary files, copied to the current folder by net get.)
+d
+f freeiv.ado
+f freeiv.dlg
+f freeiv.sthlp
+f freeiv_card.dta
+f freeiv_engine.ado
+f freeiv_examples.ado
+f freeiv_mata.ado
+f freeiv_paper.pdf
+f freeiv_proxy.dta
+f freeiv_sim1.dta
+f freeiv_sim2.dta
+f freeivdiag.ado
+f freeivdiag.sthlp
+f freeivmenu.ado
+f freeivmenu.sthlp
+f freeivreport.ado
+f freeivreport.sthlp
+f freeivtest.ado
+f freeivtest.sthlp
